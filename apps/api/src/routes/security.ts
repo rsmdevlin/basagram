@@ -5,8 +5,8 @@ import {
   generateBackupCodes,
   generateSecureToken,
   filterSensitiveData,
-} from '../middleware/security';
-import { requireAuth, AuthRequest } from '../index';
+} from '../middleware/security.js';
+import { requireAuth, AuthRequest } from '../index.js';
 
 const router = Router();
 
