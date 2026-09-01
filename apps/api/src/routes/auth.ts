@@ -140,6 +140,29 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+// Refresh token
+router.post('/refresh', async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(401).json({ error: 'Refresh token не предоставлен' });
+    }
+
+    try {
+      const decoded = jwt.verify(refreshToken, REFRESH_SECRET) as { userId: string };
+      const token = jwt.sign({ userId: decoded.userId }, JWT_SECRET, { expiresIn: '7d' });
+
+      res.json({ token });
+    } catch (error) {
+      return res.status(401).json({ error: 'Невалидный refresh token' });
+    }
+  } catch (error) {
+    console.error('Refresh error:', error);
+    res.status(500).json({ error: 'Ошибка при обновлении токена' });
+  }
+});
+
 // Get current user
 router.get('/me', async (req: Request, res: Response) => {
   try {
@@ -175,6 +198,12 @@ router.get('/me', async (req: Request, res: Response) => {
     console.error('Get me error:', error);
     res.status(401).json({ error: 'Неверный токен' });
   }
+});
+
+// Logout
+router.post('/logout', async (req: Request, res: Response) => {
+  // Client-side logout - just remove token from localStorage
+  res.json({ message: 'Логаут успешен' });
 });
 
 export default router;
