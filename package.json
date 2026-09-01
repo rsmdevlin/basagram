@@ -4,10 +4,6 @@
   "description": "Premium modern messenger",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
     "dev": "turbo run dev --parallel",
     "build": "turbo build",
