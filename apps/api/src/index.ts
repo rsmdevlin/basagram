@@ -1,7 +1,6 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import {
   compressionMiddleware,
@@ -10,6 +9,7 @@ import {
   authLimiter,
   responseTimeMiddleware,
 } from './middleware/performance.js';
+import { authenticate, requireAuth, AuthRequest } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
 import usersRoutes from './routes/users.js';
 import profilesRoutes from './routes/profiles.js';
@@ -44,39 +44,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   req.id = req.headers['x-request-id'] as string || uuidv4();
   next();
 });
-
-// Auth middleware
-interface AuthRequest extends Request {
-  userId?: string;
-  requestId?: string;
-  headers: any;
-  body: any;
-}
-
-const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader?.startsWith('Bearer ')) {
-    return next(); // Optional auth
-  }
-
-  try {
-    const token = authHeader.slice(7);
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-    req.userId = decoded.userId;
-  } catch (error) {
-    console.warn('Invalid token:', error);
-  }
-
-  next();
-};
-
-const requireAuth = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!req.userId) {
-    return res.status(401).json({ error: 'Требуется авторизация' });
-  }
-  next();
-};
 
 app.use(authenticate);
 
