@@ -3,7 +3,11 @@ export const validatePassword = (password: string) => password.length >= 8;
 
 const createSchema = () => ({
   parse: (data: any) => data,
-  safeParse: (data: any) => ({ success: true, data }),
+  safeParse: (data: any) => ({
+    success: true,
+    data,
+    error: { errors: [] }
+  }),
 });
 
 export const registerSchema = createSchema();
