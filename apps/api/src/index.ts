@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import authRoutes from './routes/auth';
 import usersRoutes from './routes/users';
+import profilesRoutes from './routes/profiles';
 
 dotenv.config({ path: '../../.env.local' });
 
@@ -77,6 +78,7 @@ app.get('/api/status', (req: Request, res: Response) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/profiles', profilesRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
