@@ -2,6 +2,104 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design System - Basagram Aurora */
+
+:root {
+  /* Primary Colors - Aurora Palette */
+  --color-primary-50: #f0f4ff;
+  --color-primary-100: #e0e9ff;
+  --color-primary-200: #c7d5ff;
+  --color-primary-300: #a3b9ff;
+  --color-primary-400: #7a94ff;
+  --color-primary-500: #5865ff;
+  --color-primary-600: #4a52e8;
+  --color-primary-700: #3d41d4;
+  --color-primary-800: #3432ad;
+  --color-primary-900: #2e2a8a;
+
+  /* Neutral Colors */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f8f9fc;
+  --color-neutral-100: #f0f2f8;
+  --color-neutral-200: #e3e6f0;
+  --color-neutral-300: #d1d5e0;
+  --color-neutral-400: #b8bcc9;
+  --color-neutral-500: #8b92a1;
+  --color-neutral-600: #626970;
+  --color-neutral-700: #4a5158;
+  --color-neutral-800: #323841;
+  --color-neutral-900: #1a1d23;
+  --color-neutral-950: #0f1117;
+
+  /* Dark Mode - Deep Space */
+  --color-dark-bg: #0f1419;
+  --color-dark-bg-secondary: #1a1f2e;
+  --color-dark-bg-tertiary: #242d3d;
+  --color-dark-text-primary: #ffffff;
+  --color-dark-text-secondary: #b8bcc9;
+  --color-dark-text-tertiary: #8b92a1;
+
+  /* Semantic Colors */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Shadow System */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+
+  /* Spacing Scale */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Typography */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  --font-mono: 'SFMono-Regular', 'Consolas', 'Liberation Mono', 'Menlo', monospace;
+
+  /* Border Radius */
+  --radius-none: 0;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  /* Transition */
+  --transition-fast: 100ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-Index */
+  --z-hide: -1;
+  --z-auto: auto;
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -11,12 +109,229 @@
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  background: #0f1419;
-  color: #fff;
+  font-family: var(--font-family);
+  background: var(--color-dark-bg);
+  color: var(--color-dark-text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Typography */
+.text-xs {
+  @apply text-xs font-normal;
+}
+
+.text-sm {
+  @apply text-sm font-normal;
+}
+
+.text-base {
+  @apply text-base font-normal;
+}
+
+.text-lg {
+  @apply text-lg font-medium;
+}
+
+.text-xl {
+  @apply text-xl font-semibold;
+}
+
+.text-2xl {
+  @apply text-2xl font-semibold;
+}
+
+.text-3xl {
+  @apply text-3xl font-bold;
+}
+
+.text-4xl {
+  @apply text-4xl font-bold;
+}
+
+/* Headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: 2rem;
+}
+
+h2 {
+  font-size: 1.5rem;
+}
+
+h3 {
+  font-size: 1.25rem;
+}
+
+/* Text colors */
+.text-primary {
+  @apply text-white;
+}
+
+.text-secondary {
+  @apply text-neutral-400;
+}
+
+.text-tertiary {
+  @apply text-neutral-500;
+}
+
+/* Background */
+.bg-primary {
+  @apply bg-neutral-900;
+}
+
+.bg-secondary {
+  @apply bg-neutral-800;
+}
+
+.bg-tertiary {
+  @apply bg-neutral-700;
+}
+
+/* Components */
+@layer components {
+  /* Button */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all cursor-pointer;
+    @apply active:scale-95;
+  }
+
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+  }
+
+  .btn-primary:disabled {
+    @apply bg-neutral-700 text-neutral-500 cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-neutral-800 text-white hover:bg-neutral-700 active:bg-neutral-600;
+  }
+
+  .btn-ghost {
+    @apply text-white hover:bg-neutral-800 active:bg-neutral-700;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  /* Input */
+  .input {
+    @apply w-full px-4 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-white placeholder-neutral-500;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply transition-all;
+  }
+
+  .input:disabled {
+    @apply bg-neutral-900 text-neutral-600 cursor-not-allowed;
+  }
+
+  /* Card */
+  .card {
+    @apply bg-neutral-900 rounded-xl border border-neutral-800 p-4;
+  }
+
+  .card-lg {
+    @apply p-6;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply bg-primary-900 text-primary-300;
+  }
+
+  .badge-success {
+    @apply bg-green-900 text-green-300;
+  }
+
+  .badge-error {
+    @apply bg-red-900 text-red-300;
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply bg-opacity-10 backdrop-blur-xl border border-white border-opacity-20;
+  }
+
+  /* Focus visible */
+  .focus-visible {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-neutral-900;
+  }
+
+  /* Skeleton */
+  .skeleton {
+    @apply bg-neutral-800 animate-pulse rounded;
+  }
+}
+
+/* Dark mode smooth transitions */
+* {
+  @apply transition-colors;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-in-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s ease-in-out;
 }
