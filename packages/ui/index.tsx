@@ -47,6 +47,7 @@ export const CallIcon = (props: any) => <span {...props}>📞</span>;
 export const MoreIcon = (props: any) => <span {...props}>⋯</span>;
 export const MenuIcon = (props: any) => <span {...props}>☰</span>;
 export const BackIcon = (props: any) => <span {...props}>←</span>;
+export const CheckIcon = (props: any) => <span {...props}>✓</span>;
 
 export default {
   Button,
