@@ -135,11 +135,17 @@ export const responseTimeMiddleware = (req: any, res: any, next: any) => {
 
   res.on('finish', () => {
     const duration = Date.now() - start;
-    res.setHeader('X-Response-Time', `${duration}ms`);
     if (duration > 1000) {
       console.warn(`Slow request: ${req.method} ${req.url} took ${duration}ms`);
     }
   });
+
+  const originalJson = res.json.bind(res);
+  res.json = function (data: any) {
+    const duration = Date.now() - start;
+    res.setHeader('X-Response-Time', `${duration}ms`);
+    return originalJson(data);
+  };
 
   next();
 };
