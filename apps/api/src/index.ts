@@ -82,6 +82,31 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/security', securityRoutes);
 
+// Root endpoint
+app.get('/', (req: Request, res: Response) => {
+  res.json({
+    service: 'Basagram API',
+    version: '0.1.0',
+    status: 'online',
+    endpoints: {
+      health: '/health',
+      status: '/api/status',
+      auth: '/api/auth',
+      users: '/api/users',
+      profiles: '/api/profiles',
+      conversations: '/api/conversations',
+      messages: '/api/messages',
+      groups: '/api/groups',
+      channels: '/api/channels',
+      stories: '/api/stories',
+      calls: '/api/calls',
+      notifications: '/api/notifications',
+      settings: '/api/settings',
+      security: '/api/security',
+    },
+  });
+});
+
 // 404 handler
 app.use((req: Request, res: Response) => {
   res.status(404).json({
