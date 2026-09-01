@@ -8,6 +8,10 @@ const config: NextConfig = {
   },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+    NEXT_PUBLIC_WEBSOCKET_URL: process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'http://localhost:3001',
+  },
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
   },
 };
 
