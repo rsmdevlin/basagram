@@ -9,6 +9,7 @@ import profilesRoutes from './routes/profiles';
 import conversationsRoutes from './routes/conversations';
 import messagesRoutes from './routes/messages';
 import attachmentsRoutes from './routes/attachments';
+import messageFeaturesRoutes from './routes/message-features';
 
 dotenv.config({ path: '../../.env.local' });
 
@@ -85,6 +86,7 @@ app.use('/api/profiles', profilesRoutes);
 app.use('/api/conversations', conversationsRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/attachments', attachmentsRoutes);
+app.use('/api/messages', messageFeaturesRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

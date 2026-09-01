@@ -152,6 +152,60 @@ const migrations = [
     `,
     down: `DROP TABLE IF EXISTS reactions;`,
   },
+  {
+    id: '008_init_pinned_messages',
+    up: `
+      CREATE TABLE IF NOT EXISTS pinned_messages (
+        id VARCHAR(36) PRIMARY KEY,
+        message_id VARCHAR(36) NOT NULL UNIQUE,
+        conversation_id VARCHAR(36) NOT NULL,
+        pinned_by_id VARCHAR(36) NOT NULL,
+        pinned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+        FOREIGN KEY (pinned_by_id) REFERENCES users(id) ON DELETE SET NULL,
+        INDEX idx_conversation_id (conversation_id),
+        INDEX idx_pinned_at (pinned_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    down: `DROP TABLE IF EXISTS pinned_messages;`,
+  },
+  {
+    id: '009_init_message_edits',
+    up: `
+      CREATE TABLE IF NOT EXISTS message_edits (
+        id VARCHAR(36) PRIMARY KEY,
+        message_id VARCHAR(36) NOT NULL,
+        old_content TEXT NOT NULL,
+        edited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+        INDEX idx_message_id (message_id),
+        INDEX idx_edited_at (edited_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    down: `DROP TABLE IF EXISTS message_edits;`,
+  },
+  {
+    id: '010_init_message_attachments',
+    up: `
+      CREATE TABLE IF NOT EXISTS message_attachments (
+        id VARCHAR(36) PRIMARY KEY,
+        message_id VARCHAR(36) NOT NULL,
+        type ENUM('image', 'video', 'audio', 'file') NOT NULL,
+        url VARCHAR(500) NOT NULL,
+        thumbnail VARCHAR(500),
+        size INT NOT NULL,
+        mime_type VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+        INDEX idx_message_id (message_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    down: `DROP TABLE IF EXISTS message_attachments;`,
+  },
 ];
 
 export async function runMigrations() {
