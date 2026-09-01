@@ -22,10 +22,7 @@
     "socket.io": "^4.7.2",
     "jsonwebtoken": "^9.1.1",
     "argon2": "^0.31.2",
-    "zod": "^3.22.4",
-    "@basagram/types": "workspace:*",
-    "@basagram/validation": "workspace:*",
-    "@basagram/database": "workspace:*"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "typescript": "^5.3.3",
