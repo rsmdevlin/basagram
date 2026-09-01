@@ -229,7 +229,7 @@ export const AuditLogItem: React.FC<AuditLogItemProps> = ({ log }) => {
     logout: 'Выход',
     profile_update: 'Обновление профиля',
     password_change: 'Изменение пароля',
-    2fa_enable: 'Включение 2FA',
+    twofa_enable: 'Включение 2FA',
   };
 
   return (
