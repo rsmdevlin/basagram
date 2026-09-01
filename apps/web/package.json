@@ -16,11 +16,7 @@
     "typescript": "^5.3.3",
     "tailwindcss": "^3.3.6",
     "postcss": "^8.4.31",
-    "autoprefixer": "^10.4.16",
-    "@basagram/types": "workspace:*",
-    "@basagram/ui": "workspace:*",
-    "@basagram/validation": "workspace:*",
-    "@basagram/utils": "workspace:*"
+    "autoprefixer": "^10.4.16"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
