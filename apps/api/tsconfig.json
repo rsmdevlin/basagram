@@ -15,7 +15,6 @@
     "sourceMap": true,
     "moduleResolution": "bundler",
     "noEmitOnError": false,
-    "baseUrl": "./src",
     "paths": {
       "@basagram/database": ["./stubs/database.ts"],
       "@basagram/validation": ["./stubs/validation.ts"]
