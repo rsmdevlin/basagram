@@ -1,3 +1,12 @@
+npm error code EUNSUPPORTEDPROTOCOL
+npm error Unsupported URL Type "workspace:": workspace:*
+npm error A complete log of this run can be found in: /opt/render/.cache/_logs/2026-09-01T21_52_17_146Z-debug-0.log
+==> Build failed 😞
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+
+
+БД: mysql://gs348298:eKDxA99Mc2sf@80.242.59.112:3306/gs348298
+
 # BASAGRAM — MASTER ENGINEERING & PRODUCT SPECIFICATION
 
 ## 0. КРИТИЧЕСКАЯ ИНСТРУКЦИЯ
