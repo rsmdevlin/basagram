@@ -290,6 +290,28 @@ const migrations = [
     `,
     down: `DROP TABLE IF EXISTS calls;`,
   },
+  {
+    id: '015_init_notifications',
+    up: `
+      CREATE TABLE IF NOT EXISTS notifications (
+        id VARCHAR(36) PRIMARY KEY,
+        recipient_id VARCHAR(36) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        body TEXT,
+        data JSON,
+        is_read BOOLEAN DEFAULT FALSE,
+        read_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_recipient_id (recipient_id),
+        INDEX idx_is_read (is_read),
+        INDEX idx_created_at (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    down: `DROP TABLE IF EXISTS notifications;`,
+  },
 ];
 
 export async function runMigrations() {

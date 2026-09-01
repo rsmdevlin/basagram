@@ -14,6 +14,7 @@ import groupsRoutes from './routes/groups';
 import channelsRoutes from './routes/channels';
 import storiesRoutes from './routes/stories';
 import callsRoutes from './routes/calls';
+import notificationsRoutes from './routes/notifications';
 
 dotenv.config({ path: '../../.env.local' });
 
@@ -95,6 +96,7 @@ app.use('/api/groups', groupsRoutes);
 app.use('/api/channels', channelsRoutes);
 app.use('/api/stories', storiesRoutes);
 app.use('/api/calls', callsRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
