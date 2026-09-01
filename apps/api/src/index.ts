@@ -9,21 +9,21 @@ import {
   createRateLimiter,
   authLimiter,
   responseTimeMiddleware,
-} from './middleware/performance';
-import authRoutes from './routes/auth';
-import usersRoutes from './routes/users';
-import profilesRoutes from './routes/profiles';
-import conversationsRoutes from './routes/conversations';
-import messagesRoutes from './routes/messages';
-import attachmentsRoutes from './routes/attachments';
-import messageFeaturesRoutes from './routes/message-features';
-import groupsRoutes from './routes/groups';
-import channelsRoutes from './routes/channels';
-import storiesRoutes from './routes/stories';
-import callsRoutes from './routes/calls';
-import notificationsRoutes from './routes/notifications';
-import settingsRoutes from './routes/settings';
-import securityRoutes from './routes/security';
+} from './middleware/performance.js';
+import authRoutes from './routes/auth.js';
+import usersRoutes from './routes/users.js';
+import profilesRoutes from './routes/profiles.js';
+import conversationsRoutes from './routes/conversations.js';
+import messagesRoutes from './routes/messages.js';
+import attachmentsRoutes from './routes/attachments.js';
+import messageFeaturesRoutes from './routes/message-features.js';
+import groupsRoutes from './routes/groups.js';
+import channelsRoutes from './routes/channels.js';
+import storiesRoutes from './routes/stories.js';
+import callsRoutes from './routes/calls.js';
+import notificationsRoutes from './routes/notifications.js';
+import settingsRoutes from './routes/settings.js';
+import securityRoutes from './routes/security.js';
 
 dotenv.config({ path: '../../.env.local' });
 
