@@ -206,6 +206,61 @@ const migrations = [
     `,
     down: `DROP TABLE IF EXISTS message_attachments;`,
   },
+  {
+    id: '011_init_stories',
+    up: `
+      CREATE TABLE IF NOT EXISTS stories (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL,
+        type ENUM('text', 'image', 'video') NOT NULL,
+        content TEXT,
+        media_url VARCHAR(500),
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_user_id (user_id),
+        INDEX idx_expires_at (expires_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    down: `DROP TABLE IF EXISTS stories;`,
+  },
+  {
+    id: '012_init_story_views',
+    up: `
+      CREATE TABLE IF NOT EXISTS story_views (
+        id VARCHAR(36) PRIMARY KEY,
+        story_id VARCHAR(36) NOT NULL,
+        viewer_id VARCHAR(36) NOT NULL,
+        viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        UNIQUE KEY unique_view (story_id, viewer_id),
+        FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE,
+        FOREIGN KEY (viewer_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_story_id (story_id),
+        INDEX idx_viewer_id (viewer_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    down: `DROP TABLE IF EXISTS story_views;`,
+  },
+  {
+    id: '013_init_story_reactions',
+    up: `
+      CREATE TABLE IF NOT EXISTS story_reactions (
+        id VARCHAR(36) PRIMARY KEY,
+        story_id VARCHAR(36) NOT NULL,
+        user_id VARCHAR(36) NOT NULL,
+        emoji VARCHAR(10) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        UNIQUE KEY unique_story_reaction (story_id, user_id, emoji),
+        FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_story_id (story_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    down: `DROP TABLE IF EXISTS story_reactions;`,
+  },
 ];
 
 export async function runMigrations() {

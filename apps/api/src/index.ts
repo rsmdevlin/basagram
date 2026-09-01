@@ -12,6 +12,7 @@ import attachmentsRoutes from './routes/attachments';
 import messageFeaturesRoutes from './routes/message-features';
 import groupsRoutes from './routes/groups';
 import channelsRoutes from './routes/channels';
+import storiesRoutes from './routes/stories';
 
 dotenv.config({ path: '../../.env.local' });
 
@@ -91,6 +92,7 @@ app.use('/api/attachments', attachmentsRoutes);
 app.use('/api/messages', messageFeaturesRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/channels', channelsRoutes);
+app.use('/api/stories', storiesRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
