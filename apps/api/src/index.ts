@@ -3,6 +3,13 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  compressionMiddleware,
+  helmetMiddleware,
+  createRateLimiter,
+  authLimiter,
+  responseTimeMiddleware,
+} from './middleware/performance';
 import authRoutes from './routes/auth';
 import usersRoutes from './routes/users';
 import profilesRoutes from './routes/profiles';
@@ -16,6 +23,7 @@ import storiesRoutes from './routes/stories';
 import callsRoutes from './routes/calls';
 import notificationsRoutes from './routes/notifications';
 import settingsRoutes from './routes/settings';
+import securityRoutes from './routes/security';
 
 dotenv.config({ path: '../../.env.local' });
 
@@ -25,7 +33,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
 // Middleware
 app.use(cors());
+app.use(compressionMiddleware);
+app.use(helmetMiddleware);
 app.use(express.json({ limit: '10mb' }));
+app.use(responseTimeMiddleware);
+app.use(createRateLimiter(15 * 60 * 1000, 100));
 
 // Request ID middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -85,8 +97,8 @@ app.get('/api/status', (req: Request, res: Response) => {
   });
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
+// Auth routes with strict rate limiting
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/profiles', profilesRoutes);
 app.use('/api/conversations', conversationsRoutes);
@@ -99,6 +111,7 @@ app.use('/api/stories', storiesRoutes);
 app.use('/api/calls', callsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/security', securityRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
