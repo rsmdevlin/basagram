@@ -312,6 +312,34 @@ const migrations = [
     `,
     down: `DROP TABLE IF EXISTS notifications;`,
   },
+  {
+    id: '016_init_user_settings',
+    up: `
+      CREATE TABLE IF NOT EXISTS user_settings (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL UNIQUE,
+        theme ENUM('light', 'dark', 'auto') DEFAULT 'dark',
+        language VARCHAR(10) DEFAULT 'ru',
+        font_size VARCHAR(20) DEFAULT 'normal',
+        notify_messages BOOLEAN DEFAULT TRUE,
+        notify_calls BOOLEAN DEFAULT TRUE,
+        notify_reactions BOOLEAN DEFAULT TRUE,
+        notify_mentions BOOLEAN DEFAULT TRUE,
+        sound_enabled BOOLEAN DEFAULT TRUE,
+        show_online_status BOOLEAN DEFAULT TRUE,
+        show_last_seen BOOLEAN DEFAULT TRUE,
+        allow_messages VARCHAR(20) DEFAULT 'all',
+        allow_calls VARCHAR(20) DEFAULT 'all',
+        blocked_users JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_user_id (user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    down: `DROP TABLE IF EXISTS user_settings;`,
+  },
 ];
 
 export async function runMigrations() {
