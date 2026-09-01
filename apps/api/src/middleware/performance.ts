@@ -53,8 +53,10 @@ export const authLimiter = rateLimit({
 // Redis cache client
 export const createCacheClient = () => {
   const client = Redis.createClient({
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
+    socket: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379'),
+    },
     db: 0,
   });
 

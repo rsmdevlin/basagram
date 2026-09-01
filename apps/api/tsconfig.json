@@ -14,7 +14,12 @@
     "declarationMap": true,
     "sourceMap": true,
     "moduleResolution": "bundler",
-    "noEmitOnError": false
+    "noEmitOnError": false,
+    "baseUrl": "./src",
+    "paths": {
+      "@basagram/database": ["./stubs/database.ts"],
+      "@basagram/validation": ["./stubs/validation.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules"]

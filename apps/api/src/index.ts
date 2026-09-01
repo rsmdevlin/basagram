@@ -46,9 +46,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // Auth middleware
-export interface AuthRequest extends Request {
+interface AuthRequest extends Request {
   userId?: string;
   requestId?: string;
+  headers: any;
+  body: any;
 }
 
 const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
