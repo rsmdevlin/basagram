@@ -22,7 +22,12 @@
     "socket.io": "^4.7.2",
     "jsonwebtoken": "^9.0.2",
     "argon2": "^0.31.2",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "compression": "^1.7.4",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "speakeasy": "^2.0.0",
+    "qrcode": "^1.5.3"
   },
   "devDependencies": {
     "typescript": "^5.3.3",
@@ -31,6 +36,7 @@
     "@types/node": "^20.10.6",
     "@types/uuid": "^9.0.7",
     "@types/jsonwebtoken": "^9.0.5",
+    "@types/compression": "^1.7.5",
     "eslint": "^8.54.0",
     "@typescript-eslint/eslint-plugin": "^6.13.2",
     "@typescript-eslint/parser": "^6.13.2"
