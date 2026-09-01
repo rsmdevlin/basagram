@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --noEmitOnError false",
+    "build": "npm run setup-stubs && tsc --noEmitOnError false",
+    "setup-stubs": "node scripts/setup-stubs.js",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
     "lint": "eslint src",

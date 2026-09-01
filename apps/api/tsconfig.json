@@ -16,8 +16,8 @@
     "moduleResolution": "bundler",
     "noEmitOnError": false,
     "paths": {
-      "@basagram/database": ["./stubs/database.ts"],
-      "@basagram/validation": ["./stubs/validation.ts"]
+      "@basagram/database": ["./database.ts"],
+      "@basagram/validation": ["./validation.ts"]
     }
   },
   "include": ["src/**/*"],
