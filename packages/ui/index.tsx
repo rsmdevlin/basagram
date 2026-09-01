@@ -34,6 +34,19 @@ export const Toast = ({ message, type }: any) => (
   <div className={`toast toast-${type}`}>{message}</div>
 );
 
+// Icon components
+export const SearchIcon = (props: any) => <span {...props}>🔍</span>;
+export const AttachIcon = (props: any) => <span {...props}>📎</span>;
+export const EmojiIcon = (props: any) => <span {...props}>😊</span>;
+export const SendIcon = (props: any) => <span {...props}>➤</span>;
+export const PhoneIcon = (props: any) => <span {...props}>☎️</span>;
+export const CameraIcon = (props: any) => <span {...props}>📷</span>;
+export const MicrophoneIcon = (props: any) => <span {...props}>🎙️</span>;
+export const CloseIcon = (props: any) => <span {...props}>✕</span>;
+export const CallIcon = (props: any) => <span {...props}>📞</span>;
+export const MoreIcon = (props: any) => <span {...props}>⋯</span>;
+export const MenuIcon = (props: any) => <span {...props}>☰</span>;
+
 export default {
   Button,
   Input,
@@ -45,4 +58,15 @@ export default {
   Avatar,
   Spinner,
   Toast,
+  SearchIcon,
+  AttachIcon,
+  EmojiIcon,
+  SendIcon,
+  PhoneIcon,
+  CameraIcon,
+  MicrophoneIcon,
+  CloseIcon,
+  CallIcon,
+  MoreIcon,
+  MenuIcon,
 };
