@@ -141,18 +141,9 @@ export default function GroupPage() {
     <div className="flex flex-col h-screen bg-neutral-950">
       {/* Header */}
       <ConversationHeader
-        title={groupName}
-        subtitle={`${members.length} участников`}
-        actions={[
-          {
-            label: '👥',
-            onClick: () => setShowSettings(!showSettings),
-          },
-          {
-            label: '⋮',
-            onClick: () => setShowSettings(!showSettings),
-          },
-        ]}
+        name={groupName}
+        isOnline={true}
+        onCall={() => console.log('Call')}
       />
 
       <div className="flex flex-1 overflow-hidden">
