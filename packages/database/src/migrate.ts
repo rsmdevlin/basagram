@@ -261,6 +261,35 @@ const migrations = [
     `,
     down: `DROP TABLE IF EXISTS story_reactions;`,
   },
+  {
+    id: '014_init_calls',
+    up: `
+      CREATE TABLE IF NOT EXISTS calls (
+        id VARCHAR(36) PRIMARY KEY,
+        initiator_id VARCHAR(36) NOT NULL,
+        recipient_id VARCHAR(36),
+        conversation_id VARCHAR(36),
+        type ENUM('audio', 'video') NOT NULL,
+        status ENUM('ringing', 'active', 'ended', 'rejected', 'missed') DEFAULT 'ringing',
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        answered_at TIMESTAMP,
+        answered_by_id VARCHAR(36),
+        ended_at TIMESTAMP,
+        duration_seconds INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        FOREIGN KEY (initiator_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (answered_by_id) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+        INDEX idx_initiator_id (initiator_id),
+        INDEX idx_recipient_id (recipient_id),
+        INDEX idx_status (status),
+        INDEX idx_started_at (started_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    down: `DROP TABLE IF EXISTS calls;`,
+  },
 ];
 
 export async function runMigrations() {
