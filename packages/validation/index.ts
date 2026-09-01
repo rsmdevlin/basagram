@@ -6,7 +6,9 @@ const createSchema = () => ({
   safeParse: (data: any) => ({
     success: true,
     data,
-    error: { errors: [] }
+    error: {
+      errors: [] as Array<{ path: (string | number)[]; message: string }>
+    }
   }),
 });
 
