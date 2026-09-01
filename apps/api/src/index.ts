@@ -11,6 +11,7 @@ import messagesRoutes from './routes/messages';
 import attachmentsRoutes from './routes/attachments';
 import messageFeaturesRoutes from './routes/message-features';
 import groupsRoutes from './routes/groups';
+import channelsRoutes from './routes/channels';
 
 dotenv.config({ path: '../../.env.local' });
 
@@ -89,6 +90,7 @@ app.use('/api/messages', messagesRoutes);
 app.use('/api/attachments', attachmentsRoutes);
 app.use('/api/messages', messageFeaturesRoutes);
 app.use('/api/groups', groupsRoutes);
+app.use('/api/channels', channelsRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
