@@ -60,6 +60,7 @@ export const registerSchema = { parse: (data) => data };
 export const loginSchema = { parse: (data) => data };
 export const createConversationSchema = { parse: (data) => data };
 export const sendMessageSchema = { parse: (data) => data };
+export const messageSchema = { parse: (data) => data };
 export const createGroupSchema = { parse: (data) => data };
 export const createChannelSchema = { parse: (data) => data };
 export const createStorySchema = { parse: (data) => data };
