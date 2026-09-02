@@ -1,4 +1,4 @@
--- Users table
+-- Users table (база для всех FK)
 CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(36) PRIMARY KEY,
   username VARCHAR(255) UNIQUE NOT NULL,
@@ -14,6 +14,34 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX idx_username (username),
   INDEX idx_email (email),
   INDEX idx_is_online (is_online)
+);
+
+-- Groups (база для group members и group messages)
+CREATE TABLE IF NOT EXISTS groups (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  avatar_url VARCHAR(500),
+  creator_id VARCHAR(36) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_creator (creator_id)
+);
+
+-- Channels (база для subscribers и posts)
+CREATE TABLE IF NOT EXISTS channels (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT,
+  avatar_url VARCHAR(500),
+  creator_id VARCHAR(36) NOT NULL,
+  is_public BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_creator (creator_id),
+  INDEX idx_is_public (is_public)
 );
 
 -- Conversations (private chats)
@@ -49,19 +77,6 @@ CREATE TABLE IF NOT EXISTS messages (
   INDEX idx_created_at (created_at)
 );
 
--- Groups
-CREATE TABLE IF NOT EXISTS groups (
-  id VARCHAR(36) PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  avatar_url VARCHAR(500),
-  creator_id VARCHAR(36) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
-  INDEX idx_creator (creator_id)
-);
-
 -- Group members
 CREATE TABLE IF NOT EXISTS group_members (
   id VARCHAR(36) PRIMARY KEY,
@@ -93,21 +108,6 @@ CREATE TABLE IF NOT EXISTS group_messages (
   INDEX idx_group (group_id),
   INDEX idx_sender (sender_id),
   INDEX idx_created_at (created_at)
-);
-
--- Channels
-CREATE TABLE IF NOT EXISTS channels (
-  id VARCHAR(36) PRIMARY KEY,
-  name VARCHAR(255) NOT NULL UNIQUE,
-  description TEXT,
-  avatar_url VARCHAR(500),
-  creator_id VARCHAR(36) NOT NULL,
-  is_public BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
-  INDEX idx_creator (creator_id),
-  INDEX idx_is_public (is_public)
 );
 
 -- Channel subscribers
