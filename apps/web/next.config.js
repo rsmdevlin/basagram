@@ -12,8 +12,9 @@ const nextConfig = {
     };
     return config;
   },
-  rewrites: async () => {
-    const apiUrl = process.env.API_URL || 'http://localhost:3001';
+  async rewrites() {
+    const apiUrl = process.env.API_URL || 'http://localhost:3002';
+    console.log(`[Next.js] Configuring API rewrites to: ${apiUrl}`);
     return {
       beforeFiles: [
         {
