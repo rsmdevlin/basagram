@@ -1,237 +1,210 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import jwt from 'jsonwebtoken';
-import { query, execute } from '@basagram/database';
+import mysql from 'mysql2/promise';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+let pool: mysql.Pool;
 
-// Initiate call
-router.post('/', async (req: Request, res: Response) => {
+const getPool = async () => {
+  if (!pool) {
+    const getDatabaseConfig = () => {
+      if (process.env.DATABASE_URL) {
+        try {
+          const url = new URL(process.env.DATABASE_URL);
+          return {
+            host: url.hostname,
+            port: parseInt(url.port || '3306'),
+            user: url.username,
+            password: url.password,
+            database: url.pathname.slice(1),
+          };
+        } catch (e) {
+          console.error('Failed to parse DATABASE_URL:', e);
+        }
+      }
+
+      return {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '3306'),
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'basagram',
+      };
+    };
+
+    const config = getDatabaseConfig();
+    pool = mysql.createPool({
+      ...config,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+  }
+  return pool;
+};
+
+const dbQuery = async <T = any>(sql: string, params?: any[]): Promise<T[]> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const [rows] = await connection.query(sql, params || []);
+    return rows as T[];
+  } finally {
+    connection.release();
+  }
+};
+
+const dbExecute = async (sql: string, params?: any[]): Promise<any> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
+  try {
+    const [result] = await connection.execute(sql, params || []);
+    return result;
+  } finally {
+    connection.release();
+  }
+};
+
+// Get all calls for user
+router.get('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    if (!userId) {
       return res.status(401).json({ error: 'Требуется авторизация' });
     }
 
-    const token = authHeader.slice(7);
-    let userId: string;
+    const calls = await dbQuery<any>(
+      `SELECT
+        c.id,
+        CASE
+          WHEN c.initiator_id = ? THEN c.recipient_id
+          ELSE c.initiator_id
+        END as participant_id,
+        u.display_name as participant_name,
+        u.avatar_url as participant_avatar,
+        c.type,
+        CASE
+          WHEN c.initiator_id = ? THEN 'outgoing'
+          WHEN c.status = 'missed' THEN 'missed'
+          ELSE 'incoming'
+        END as status,
+        c.duration,
+        c.created_at
+      FROM calls c
+      LEFT JOIN users u ON u.id = CASE
+        WHEN c.initiator_id = ? THEN c.recipient_id
+        ELSE c.initiator_id
+      END
+      WHERE c.initiator_id = ? OR c.recipient_id = ?
+      ORDER BY c.created_at DESC
+      LIMIT 100`,
+      [userId, userId, userId, userId, userId]
+    );
 
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
+    res.json(
+      calls.map((call) => ({
+        id: call.id,
+        participantId: call.participant_id,
+        participantName: call.participant_name,
+        participantAvatar: call.participant_avatar,
+        type: call.type,
+        status: call.status,
+        duration: call.duration,
+        createdAt: call.created_at,
+      }))
+    );
+  } catch (error) {
+    console.error('[Calls Get] Error:', error);
+    res.status(500).json({ error: 'Ошибка при загрузке звонков' });
+  }
+});
 
-    const { type, recipientId, conversationId } = req.body;
+// Initiate call
+router.post('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { recipientId, type } = req.body;
 
-    if (!type || !['audio', 'video'].includes(type)) {
-      return res.status(400).json({ error: 'type должен быть audio или video' });
-    }
-
-    if (!recipientId && !conversationId) {
-      return res.status(400).json({ error: 'Требуется recipientId или conversationId' });
+    if (!recipientId || !type || !['audio', 'video'].includes(type)) {
+      return res.status(400).json({ error: 'Требуется recipientId и type (audio/video)' });
     }
 
     const callId = uuidv4();
-    await execute(
-      `INSERT INTO calls
-       (id, initiator_id, recipient_id, conversation_id, type, status, started_at)
-       VALUES (?, ?, ?, ?, ?, 'ringing', NOW())`,
-      [callId, userId, recipientId || null, conversationId || null, type]
+    await dbExecute(
+      `INSERT INTO calls (id, initiator_id, recipient_id, type, status)
+       VALUES (?, ?, ?, ?, ?)`,
+      [callId, userId, recipientId, type, 'ringing']
     );
 
     res.status(201).json({
       id: callId,
+      initiatorId: userId,
+      recipientId,
       type,
       status: 'ringing',
-      initiator: userId,
-      recipient: recipientId,
-      startedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Initiate call error:', error);
+    console.error('[Call Initiate] Error:', error);
     res.status(500).json({ error: 'Ошибка при инициировании звонка' });
   }
 });
 
-// Accept call
-router.post('/:callId/accept', async (req: Request, res: Response) => {
+// Answer call
+router.patch('/:callId/answer', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
+    const userId = (req as any).userId;
     const { callId } = req.params;
 
-    await execute(
-      'UPDATE calls SET status = ?, answered_by_id = ?, answered_at = NOW() WHERE id = ?',
-      ['active', userId, callId]
-    );
-
-    const call = await query('SELECT * FROM calls WHERE id = ?', [callId]);
-
-    res.json({ ...call[0], status: 'active' });
-  } catch (error) {
-    console.error('Accept call error:', error);
-    res.status(500).json({ error: 'Ошибка при принятии звонка' });
-  }
-});
-
-// Reject call
-router.post('/:callId/reject', async (req: Request, res: Response) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const { callId } = req.params;
-
-    await execute(
-      'UPDATE calls SET status = ?, ended_at = NOW() WHERE id = ?',
-      ['rejected', callId]
+    await dbExecute(
+      `UPDATE calls SET status = ?, answered_at = NOW()
+       WHERE id = ? AND recipient_id = ?`,
+      ['active', callId, userId]
     );
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Reject call error:', error);
-    res.status(500).json({ error: 'Ошибка при отклонении звонка' });
+    console.error('[Call Answer] Error:', error);
+    res.status(500).json({ error: 'Ошибка при принятии звонка' });
   }
 });
 
-// End call
-router.post('/:callId/end', async (req: Request, res: Response) => {
+// Reject/end call
+router.patch('/:callId/end', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
     const { callId } = req.params;
+    const { duration } = req.body;
 
-    const call = await query('SELECT * FROM calls WHERE id = ?', [callId]);
-
-    if (call.length === 0) {
-      return res.status(404).json({ error: 'Звонок не найден' });
-    }
-
-    const duration = Math.round(
-      (new Date().getTime() - new Date(call[0].started_at).getTime()) / 1000
+    await dbExecute(
+      `UPDATE calls SET status = ?, ended_at = NOW(), duration = ?
+       WHERE id = ?`,
+      ['ended', duration || null, callId]
     );
 
-    await execute(
-      'UPDATE calls SET status = ?, ended_at = NOW(), duration_seconds = ? WHERE id = ?',
-      ['ended', duration, callId]
-    );
-
-    res.json({ success: true, duration });
+    res.json({ success: true });
   } catch (error) {
-    console.error('End call error:', error);
+    console.error('[Call End] Error:', error);
     res.status(500).json({ error: 'Ошибка при завершении звонка' });
   }
 });
 
-// Get call history
-router.get('/history', async (req: Request, res: Response) => {
+// Mark call as missed
+router.patch('/:callId/miss', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
+    const { callId } = req.params;
 
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const history = await query(
-      `SELECT c.*,
-              u1.username as initiator_username, u1.display_name as initiator_name,
-              u2.username as recipient_username, u2.display_name as recipient_name
-       FROM calls c
-       LEFT JOIN users u1 ON c.initiator_id = u1.id
-       LEFT JOIN users u2 ON c.recipient_id = u2.id
-       WHERE c.initiator_id = ? OR c.recipient_id = ?
-       ORDER BY c.started_at DESC
-       LIMIT 50`,
-      [userId, userId]
+    await dbExecute(
+      `UPDATE calls SET status = ?
+       WHERE id = ? AND status = ?`,
+      ['missed', callId, 'ringing']
     );
 
-    res.json(history);
+    res.json({ success: true });
   } catch (error) {
-    console.error('Get history error:', error);
-    res.status(500).json({ error: 'Ошибка при получении истории звонков' });
-  }
-});
-
-// Get active calls for user
-router.get('/active', async (req: Request, res: Response) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const activeCalls = await query(
-      `SELECT * FROM calls
-       WHERE (initiator_id = ? OR recipient_id = ?)
-       AND status IN ('ringing', 'active')`,
-      [userId, userId]
-    );
-
-    res.json(activeCalls);
-  } catch (error) {
-    console.error('Get active calls error:', error);
-    res.status(500).json({ error: 'Ошибка при получении активных звонков' });
+    console.error('[Call Miss] Error:', error);
+    res.status(500).json({ error: 'Ошибка при отметке пропущенного звонка' });
   }
 });
 

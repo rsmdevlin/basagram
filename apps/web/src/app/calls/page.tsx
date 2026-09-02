@@ -1,162 +1,158 @@
 'use client';
 
-import React, { useState } from 'react';
-import { CallHistory, IncomingCallDialog, ActiveCall } from '@/components/CallComponents';
+import React, { useState, useEffect } from 'react';
 
-interface HistoryItem {
+interface Call {
   id: string;
+  participantId: string;
+  participantName: string;
+  participantAvatar?: string;
   type: 'audio' | 'video';
-  initiatorName: string;
-  recipientName: string;
-  status: 'ended' | 'missed' | 'rejected';
   duration?: number;
-  timestamp: Date;
+  status: 'incoming' | 'outgoing' | 'missed';
+  createdAt: string;
 }
 
 export default function CallsPage() {
-  const [callHistory, setCallHistory] = useState<HistoryItem[]>([
-    {
-      id: '1',
-      type: 'video',
-      initiatorName: 'Вы',
-      recipientName: 'Анна',
-      status: 'ended',
-      duration: 1245,
-      timestamp: new Date(Date.now() - 86400000),
-    },
-    {
-      id: '2',
-      type: 'audio',
-      initiatorName: 'Борис',
-      recipientName: 'Вы',
-      status: 'ended',
-      duration: 324,
-      timestamp: new Date(Date.now() - 172800000),
-    },
-    {
-      id: '3',
-      type: 'video',
-      initiatorName: 'Вера',
-      recipientName: 'Вы',
-      status: 'missed',
-      timestamp: new Date(Date.now() - 259200000),
-    },
-    {
-      id: '4',
-      type: 'audio',
-      initiatorName: 'Вы',
-      recipientName: 'Дмитрий',
-      status: 'ended',
-      duration: 789,
-      timestamp: new Date(Date.now() - 345600000),
-    },
-  ]);
+  const [calls, setCalls] = useState<Call[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [filterType, setFilterType] = useState<'all' | 'incoming' | 'outgoing' | 'missed'>('all');
 
-  const [incomingCall, setIncomingCall] = useState(false);
-  const [activeCall, setActiveCall] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [videoEnabled, setVideoEnabled] = useState(true);
+  useEffect(() => {
+    const loadCalls = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/calls', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-  const handleRejectCall = () => {
-    setIncomingCall(false);
-  };
+        if (!res.ok) throw new Error('Failed to load calls');
 
-  const handleAcceptCall = () => {
-    setIncomingCall(false);
-    setActiveCall(true);
-  };
+        const data = await res.json();
+        setCalls(data);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Failed to load calls:', error);
+        setIsLoading(false);
+      }
+    };
 
-  const handleEndCall = () => {
-    setActiveCall(false);
+    loadCalls();
+  }, []);
+
+  const filteredCalls = calls.filter((call) => (filterType === 'all' ? true : call.status === filterType));
+
+  const formatTime = (date: string) => {
+    const d = new Date(date);
+    const today = new Date();
+    const isToday = d.toDateString() === today.toDateString();
+
+    if (isToday) {
+      return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    return d.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' });
   };
 
   const formatDuration = (seconds?: number) => {
-    if (!seconds) return 'Не отвечено';
+    if (!seconds) return '';
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
+    if (mins === 0) return `${secs}с`;
     return `${mins}м ${secs}с`;
   };
 
-  return (
-    <div className="min-h-screen bg-neutral-950 flex flex-col">
-      {/* Header */}
-      <div className="bg-neutral-900 border-b border-neutral-800 p-4 md:p-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-white">История звонков</h1>
-        <p className="text-sm text-neutral-400 mt-2">
-          Все входящие и исходящие звонки
-        </p>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-telegram-text-secondary">Загружаем звонки...</p>
       </div>
+    );
+  }
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="max-w-2xl mx-auto">
-          {callHistory.length === 0 ? (
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="max-w-4xl mx-auto p-4">
+        <h1 className="text-3xl font-bold text-telegram-text mb-6">Звонки</h1>
+
+        {/* Filter Tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {(['all', 'incoming', 'outgoing', 'missed'] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => setFilterType(type)}
+              className={`px-4 py-2 rounded-full whitespace-nowrap transition ${
+                filterType === type
+                  ? 'bg-telegram-blue text-white'
+                  : 'bg-telegram-bg-hover text-telegram-text hover:bg-telegram-border'
+              }`}
+            >
+              {type === 'all' && 'Все'}
+              {type === 'incoming' && 'Входящие'}
+              {type === 'outgoing' && 'Исходящие'}
+              {type === 'missed' && 'Пропущенные'}
+            </button>
+          ))}
+        </div>
+
+        {/* Calls List */}
+        <div className="space-y-2">
+          {filteredCalls.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-2xl mb-4">📞</p>
-              <p className="text-neutral-400">История звонков пуста</p>
-              <p className="text-sm text-neutral-500 mt-2">
-                Здесь будут отображаться все входящие и исходящие звонки
-              </p>
+              <p className="text-telegram-text-secondary mb-2">Нет звонков</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {/* Active Calls Section */}
-              <div>
-                <h2 className="text-xs font-semibold text-neutral-400 uppercase mb-3 px-4">
-                  Активные звонки
-                </h2>
-                <div className="space-y-2">
-                  {/* No active calls in demo */}
-                  <p className="text-xs text-neutral-500 px-4">Нет активных звонков</p>
+            filteredCalls.map((call) => (
+              <div
+                key={call.id}
+                className="flex items-center justify-between p-4 bg-telegram-bg-hover rounded-lg hover:bg-telegram-border transition border border-telegram-border"
+              >
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  {/* Avatar */}
+                  <div className="w-12 h-12 rounded-full bg-telegram-blue flex items-center justify-center text-white font-bold flex-shrink-0">
+                    {call.participantName.charAt(0).toUpperCase()}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-telegram-text truncate">{call.participantName}</p>
+                    <div className="flex items-center gap-2">
+                      {/* Status Icon */}
+                      <span className="text-xs">
+                        {call.status === 'incoming' && '⬇️ Входящий'}
+                        {call.status === 'outgoing' && '⬆️ Исходящий'}
+                        {call.status === 'missed' && '❌ Пропущенный'}
+                      </span>
+                      {/* Call Type */}
+                      <span className="text-xs text-telegram-text-secondary">
+                        {call.type === 'audio' ? '📞 Аудио' : '📹 Видео'}
+                      </span>
+                      {/* Duration */}
+                      {call.duration && (
+                        <span className="text-xs text-telegram-text-secondary">
+                          • {formatDuration(call.duration)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Time */}
+                <div className="text-xs text-telegram-text-secondary flex-shrink-0 ml-2">
+                  {formatTime(call.createdAt)}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 ml-4">
+                  <button className="text-telegram-blue hover:text-telegram-accent transition p-2 rounded-lg hover:bg-white">
+                    {call.type === 'audio' ? '📞' : '📹'}
+                  </button>
                 </div>
               </div>
-
-              {/* Divider */}
-              <div className="border-t border-neutral-800 my-4" />
-
-              {/* Recent Calls */}
-              <div>
-                <h2 className="text-xs font-semibold text-neutral-400 uppercase mb-3 px-4">
-                  Недавние звонки
-                </h2>
-                <CallHistory calls={callHistory} />
-              </div>
-            </div>
+            ))
           )}
         </div>
       </div>
-
-      {/* Incoming Call Dialog */}
-      <IncomingCallDialog
-        isOpen={incomingCall}
-        callerName="Анна"
-        type="video"
-        onAccept={handleAcceptCall}
-        onReject={handleRejectCall}
-      />
-
-      {/* Active Call */}
-      {activeCall && (
-        <ActiveCall
-          callerName="Анна"
-          callType="video"
-          duration={0}
-          isMuted={isMuted}
-          videoEnabled={videoEnabled}
-          onMute={() => setIsMuted(!isMuted)}
-          onToggleVideo={() => setVideoEnabled(!videoEnabled)}
-          onEnd={handleEndCall}
-        />
-      )}
-
-      {/* Floating Call Button */}
-      <button
-        onClick={() => setIncomingCall(true)}
-        className="fixed bottom-8 right-8 w-14 h-14 rounded-full bg-primary-600 hover:bg-primary-700 text-white flex items-center justify-center shadow-lg transition-all hover:scale-110"
-        title="Начать звонок"
-      >
-        📞
-      </button>
     </div>
   );
 }

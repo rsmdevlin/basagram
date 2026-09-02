@@ -1,154 +1,174 @@
 'use client';
 
-import React, { useState } from 'react';
-import { SearchIcon } from '@basagram/ui';
-import { ChannelCard, CreateChannelDialog } from '@/components/ChannelComponents';
+import React, { useState, useEffect } from 'react';
 
 interface Channel {
   id: string;
   name: string;
   description?: string;
-  subscriberCount: number;
-  isSubscribed?: boolean;
+  avatar?: string;
+  isPublic: boolean;
+  subscribersCount: number;
+  createdAt: string;
 }
 
 export default function ChannelsPage() {
-  const [channels, setChannels] = useState<Channel[]>([
-    {
-      id: '1',
-      name: 'новости',
-      description: 'Последние новости и обновления',
-      subscriberCount: 1245,
-      isSubscribed: true,
-    },
-    {
-      id: '2',
-      name: 'объявления',
-      description: 'Важные объявления для всех',
-      subscriberCount: 892,
-      isSubscribed: false,
-    },
-    {
-      id: '3',
-      name: 'разработка',
-      description: 'Обсуждение разработки',
-      subscriberCount: 456,
-      isSubscribed: true,
-    },
-    {
-      id: '4',
-      name: 'дизайн',
-      description: 'Дизайн и UX/UI',
-      subscriberCount: 234,
-      isSubscribed: false,
-    },
-  ]);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  const [channelName, setChannelName] = useState('');
+  const [channelDescription, setChannelDescription] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [search, setSearch] = useState('');
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  useEffect(() => {
+    const loadChannels = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/channels', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-  const filteredChannels = channels.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.description && c.description.toLowerCase().includes(search.toLowerCase()))
-  );
+        if (!res.ok) throw new Error('Failed to load channels');
 
-  const handleCreateChannel = (name: string, description?: string) => {
-    const newChannel: Channel = {
-      id: String(channels.length + 1),
-      name: name.toLowerCase().replace(/\s+/g, '_'),
-      description,
-      subscriberCount: 1,
-      isSubscribed: true,
+        const data = await res.json();
+        setChannels(data);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Failed to load channels:', error);
+        setIsLoading(false);
+      }
     };
-    setChannels([newChannel, ...channels]);
+
+    loadChannels();
+  }, []);
+
+  const handleCreateChannel = async () => {
+    if (!channelName.trim()) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/channels', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: channelName,
+          description: channelDescription,
+          isPublic,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to create channel');
+
+      const newChannel = await res.json();
+      setChannels([...channels, newChannel]);
+      setChannelName('');
+      setChannelDescription('');
+      setShowCreateForm(false);
+    } catch (error) {
+      console.error('Failed to create channel:', error);
+    }
   };
 
-  const handleSubscribe = (channelId: string) => {
-    setChannels(
-      channels.map((c) =>
-        c.id === channelId
-          ? { ...c, isSubscribed: true, subscriberCount: c.subscriberCount + 1 }
-          : c
-      )
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-telegram-text-secondary">Загружаем каналы...</p>
+      </div>
     );
-  };
-
-  const handleUnsubscribe = (channelId: string) => {
-    setChannels(
-      channels.map((c) =>
-        c.id === channelId
-          ? { ...c, isSubscribed: false, subscriberCount: c.subscriberCount - 1 }
-          : c
-      )
-    );
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-neutral-950 flex flex-col">
-      {/* Header */}
-      <div className="bg-neutral-900 border-b border-neutral-800 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Каналы</h1>
+    <div className="min-h-screen bg-white">
+      <div className="max-w-6xl mx-auto p-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-telegram-text">Каналы</h1>
           <button
-            onClick={() => setShowCreateDialog(true)}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium"
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="bg-telegram-blue text-white px-6 py-2 rounded-lg hover:bg-telegram-accent transition"
           >
             + Создать канал
           </button>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <SearchIcon
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500"
-          />
-          <input
-            type="text"
-            placeholder="Поиск каналов..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-neutral-900 border-b border-neutral-800 px-4 md:px-6 flex gap-6">
-        <button className="px-4 py-3 text-sm font-medium text-white border-b-2 border-primary-600">
-          Все каналы
-        </button>
-        <button className="px-4 py-3 text-sm font-medium text-neutral-400 hover:text-white transition-colors border-b-2 border-transparent">
-          Мои подписки
-        </button>
-      </div>
-
-      {/* Channels List */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="max-w-4xl mx-auto grid gap-4">
-          {filteredChannels.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-neutral-400">Каналы не найдены</p>
-            </div>
-          ) : (
-            filteredChannels.map((channel) => (
-              <ChannelCard
-                key={channel.id}
-                {...channel}
-                onSubscribe={() => handleSubscribe(channel.id)}
-                onUnsubscribe={() => handleUnsubscribe(channel.id)}
+        {showCreateForm && (
+          <div className="bg-telegram-bg-hover p-6 rounded-lg mb-6 border border-telegram-border">
+            <h2 className="text-lg font-semibold text-telegram-text mb-4">Новый канал</h2>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={channelName}
+                onChange={(e) => setChannelName(e.target.value)}
+                placeholder="Название канала"
+                className="w-full px-4 py-2 border border-telegram-border rounded-lg focus:outline-none focus:border-telegram-blue"
               />
-            ))
-          )}
+              <textarea
+                value={channelDescription}
+                onChange={(e) => setChannelDescription(e.target.value)}
+                placeholder="Описание канала"
+                className="w-full px-4 py-2 border border-telegram-border rounded-lg focus:outline-none focus:border-telegram-blue"
+                rows={3}
+              />
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="w-4 h-4 accent-telegram-blue"
+                />
+                <span className="text-telegram-text">Публичный канал</span>
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCreateChannel}
+                  className="bg-telegram-blue text-white px-6 py-2 rounded-lg hover:bg-telegram-accent transition"
+                >
+                  Создать
+                </button>
+                <button
+                  onClick={() => setShowCreateForm(false)}
+                  className="bg-telegram-bg-hover text-telegram-text px-6 py-2 rounded-lg hover:bg-telegram-border transition border border-telegram-border"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {channels.map((channel) => (
+            <div
+              key={channel.id}
+              onClick={() => setSelectedChannelId(channel.id)}
+              className={`p-4 rounded-lg border cursor-pointer transition ${
+                selectedChannelId === channel.id
+                  ? 'border-telegram-blue bg-telegram-bg-selected'
+                  : 'border-telegram-border hover:bg-telegram-bg-hover'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-full bg-avatar-blue flex items-center justify-center text-white font-bold flex-shrink-0">
+                  #
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-telegram-text">{channel.name}</h3>
+                  {channel.description && (
+                    <p className="text-sm text-telegram-text-secondary line-clamp-2">{channel.description}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-2 text-xs text-telegram-text-secondary">
+                    <span>{channel.subscribersCount} подписчиков</span>
+                    {channel.isPublic && <span>• Публичный</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Create Channel Dialog */}
-      <CreateChannelDialog
-        isOpen={showCreateDialog}
-        onClose={() => setShowCreateDialog(false)}
-        onCreate={handleCreateChannel}
-      />
     </div>
   );
 }

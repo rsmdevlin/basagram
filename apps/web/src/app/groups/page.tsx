@@ -1,148 +1,211 @@
 'use client';
 
-import React, { useState } from 'react';
-import { CreateGroupDialog } from '@/components/GroupComponents';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-interface GroupItem {
+interface GroupMember {
+  id: string;
+  username: string;
+  displayName: string;
+  role: 'member' | 'moderator' | 'admin';
+}
+
+interface Group {
   id: string;
   name: string;
-  memberCount: number;
-  lastMessage?: string;
-  unreadCount?: number;
+  description?: string;
+  avatar?: string;
+  membersCount: number;
+  creatorId: string;
+  createdAt: string;
 }
 
 export default function GroupsPage() {
-  const [groups, setGroups] = useState<GroupItem[]>([
-    {
-      id: '1',
-      name: 'Разработчики',
-      memberCount: 4,
-      lastMessage: 'Вы: Спасибо за приглашение!',
-      unreadCount: 0,
-    },
-    {
-      id: '2',
-      name: 'Дизайнеры',
-      memberCount: 6,
-      lastMessage: 'Анна: Новые макеты готовы',
-      unreadCount: 2,
-    },
-    {
-      id: '3',
-      name: 'Маркетинг',
-      memberCount: 8,
-      lastMessage: 'Федор: Давайте обсудим план',
-      unreadCount: 0,
-    },
-  ]);
+  const router = useRouter();
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [members, setMembers] = useState<GroupMember[]>([]);
+  const [groupName, setGroupName] = useState('');
+  const [groupDescription, setGroupDescription] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [search, setSearch] = useState('');
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  useEffect(() => {
+    const loadGroups = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/groups', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-  const filteredGroups = groups.filter((g) =>
-    g.name.toLowerCase().includes(search.toLowerCase())
-  );
+        if (!res.ok) throw new Error('Failed to load groups');
 
-  const handleCreateGroup = (name: string, members: string[]) => {
-    const newGroup: GroupItem = {
-      id: String(groups.length + 1),
-      name,
-      memberCount: members.length + 1,
+        const data = await res.json();
+        setGroups(data);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Failed to load groups:', error);
+        setIsLoading(false);
+      }
     };
-    setGroups([newGroup, ...groups]);
+
+    loadGroups();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedGroupId) return;
+
+    const loadGroupMembers = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/groups/${selectedGroupId}/members`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error('Failed to load members');
+
+        const data = await res.json();
+        setMembers(data);
+      } catch (error) {
+        console.error('Failed to load members:', error);
+      }
+    };
+
+    loadGroupMembers();
+  }, [selectedGroupId]);
+
+  const handleCreateGroup = async () => {
+    if (!groupName.trim()) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: groupName,
+          description: groupDescription,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to create group');
+
+      const newGroup = await res.json();
+      setGroups([...groups, newGroup]);
+      setGroupName('');
+      setGroupDescription('');
+      setShowCreateForm(false);
+    } catch (error) {
+      console.error('Failed to create group:', error);
+    }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-telegram-text-secondary">Загружаем группы...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-neutral-950 flex flex-col">
-      {/* Header */}
-      <div className="bg-neutral-900 border-b border-neutral-800 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Группы</h1>
+    <div className="min-h-screen bg-white">
+      <div className="max-w-6xl mx-auto p-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-telegram-text">Группы</h1>
           <button
-            onClick={() => setShowCreateDialog(true)}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium"
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="bg-telegram-blue text-white px-6 py-2 rounded-lg hover:bg-telegram-accent transition"
           >
-            + Новая группа
+            + Создать группу
           </button>
         </div>
 
-        {/* Search */}
-        <input
-          type="text"
-          placeholder="Поиск групп..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full px-4 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-        />
-      </div>
-
-      {/* Groups List */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="max-w-2xl mx-auto space-y-3">
-          {filteredGroups.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-neutral-400">Групп не найдено</p>
-              <button
-                onClick={() => setShowCreateDialog(true)}
-                className="mt-4 text-primary-400 hover:text-primary-300 transition-colors"
-              >
-                Создать первую группу
-              </button>
+        {showCreateForm && (
+          <div className="bg-telegram-bg-hover p-6 rounded-lg mb-6 border border-telegram-border">
+            <h2 className="text-lg font-semibold text-telegram-text mb-4">Новая группа</h2>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Название группы"
+                className="w-full px-4 py-2 border border-telegram-border rounded-lg focus:outline-none focus:border-telegram-blue"
+              />
+              <textarea
+                value={groupDescription}
+                onChange={(e) => setGroupDescription(e.target.value)}
+                placeholder="Описание группы"
+                className="w-full px-4 py-2 border border-telegram-border rounded-lg focus:outline-none focus:border-telegram-blue"
+                rows={3}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCreateGroup}
+                  className="bg-telegram-blue text-white px-6 py-2 rounded-lg hover:bg-telegram-accent transition"
+                >
+                  Создать
+                </button>
+                <button
+                  onClick={() => setShowCreateForm(false)}
+                  className="bg-telegram-bg-hover text-telegram-text px-6 py-2 rounded-lg hover:bg-telegram-border transition border border-telegram-border"
+                >
+                  Отмена
+                </button>
+              </div>
             </div>
-          ) : (
-            filteredGroups.map((group) => (
-              <a
-                key={group.id}
-                href={`/groups/${group.id}`}
-                className="block p-4 bg-neutral-900 border border-neutral-800 rounded-lg hover:border-neutral-700 hover:bg-neutral-800/50 transition-all"
-              >
-                <div className="flex items-start gap-4">
-                  {/* Avatar */}
-                  <div className="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                    {group.name.charAt(0).toUpperCase()}
-                  </div>
+          </div>
+        )}
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-white truncate">
-                        {group.name}
-                      </h3>
-                      {group.unreadCount && group.unreadCount > 0 && (
-                        <span className="px-2 py-1 bg-primary-600 text-white text-xs rounded-full flex-shrink-0">
-                          {group.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-neutral-500 mb-2">
-                      👥 {group.memberCount} участников
-                    </p>
-                    {group.lastMessage && (
-                      <p className="text-xs text-neutral-400 truncate">
-                        {group.lastMessage}
-                      </p>
-                    )}
-                  </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {groups.map((group) => (
+            <div
+              key={group.id}
+              onClick={() => setSelectedGroupId(group.id)}
+              className={`p-4 rounded-lg border cursor-pointer transition ${
+                selectedGroupId === group.id
+                  ? 'border-telegram-blue bg-telegram-bg-selected'
+                  : 'border-telegram-border hover:bg-telegram-bg-hover'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-full bg-telegram-blue flex items-center justify-center text-white font-bold flex-shrink-0">
+                  {group.name.charAt(0).toUpperCase()}
                 </div>
-              </a>
-            ))
-          )}
+                <div className="flex-1">
+                  <h3 className="font-semibold text-telegram-text">{group.name}</h3>
+                  {group.description && (
+                    <p className="text-sm text-telegram-text-secondary line-clamp-2">{group.description}</p>
+                  )}
+                  <p className="text-xs text-telegram-text-secondary mt-2">{group.membersCount} участников</p>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
 
-      {/* Create Group Dialog */}
-      <CreateGroupDialog
-        isOpen={showCreateDialog}
-        onClose={() => setShowCreateDialog(false)}
-        onCreate={handleCreateGroup}
-        availableUsers={[
-          { id: '1', name: 'Анна' },
-          { id: '2', name: 'Борис' },
-          { id: '3', name: 'Вера' },
-          { id: '4', name: 'Дмитрий' },
-          { id: '5', name: 'Елена' },
-        ]}
-      />
+        {selectedGroupId && (
+          <div className="mt-6 bg-telegram-bg-hover p-6 rounded-lg border border-telegram-border">
+            <h2 className="text-lg font-semibold text-telegram-text mb-4">Участники</h2>
+            <div className="space-y-2">
+              {members.map((member) => (
+                <div key={member.id} className="flex items-center justify-between p-2 bg-white rounded-lg">
+                  <div>
+                    <p className="font-medium text-telegram-text">{member.displayName}</p>
+                    <p className="text-xs text-telegram-text-secondary">{member.username}</p>
+                  </div>
+                  <span className="text-xs bg-telegram-blue text-white px-3 py-1 rounded-full">
+                    {member.role === 'admin' ? 'Админ' : member.role === 'moderator' ? 'Модератор' : 'Участник'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

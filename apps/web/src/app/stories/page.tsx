@@ -1,176 +1,283 @@
 'use client';
 
-import React, { useState } from 'react';
-import { CreateStoryDialog, StoryCard, StoryViewer } from '@/components/StoryComponents';
+import React, { useState, useEffect } from 'react';
 
 interface Story {
   id: string;
-  username: string;
-  displayName: string;
-  avatar: string;
-  type: 'text' | 'image' | 'video';
-  content?: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  content: string;
   mediaUrl?: string;
-  viewCount: number;
+  mediaType?: 'image' | 'video';
+  views: number;
   isViewed: boolean;
-  reactions?: Array<{ emoji: string; count: number }>;
-  createdAt: Date;
+  expiresAt: string;
+  createdAt: string;
 }
 
 export default function StoriesPage() {
-  const [stories, setStories] = useState<Story[]>([
-    {
-      id: '1',
-      username: 'anna',
-      displayName: 'Анна',
-      avatar: '👩‍🦰',
-      type: 'text',
-      content: 'Отличный день для разработки! ☀️',
-      viewCount: 12,
-      isViewed: true,
-      reactions: [{ emoji: '❤️', count: 3 }, { emoji: '👍', count: 2 }],
-      createdAt: new Date(Date.now() - 3600000),
-    },
-    {
-      id: '2',
-      username: 'boris',
-      displayName: 'Борис',
-      avatar: '👨‍💼',
-      type: 'image',
-      viewCount: 8,
-      isViewed: false,
-      createdAt: new Date(Date.now() - 7200000),
-    },
-    {
-      id: '3',
-      username: 'vera',
-      displayName: 'Вера',
-      avatar: '👩‍🎨',
-      type: 'text',
-      content: 'Завершила новый дизайн! Очень довольна результатом 🎨',
-      viewCount: 24,
-      isViewed: true,
-      reactions: [{ emoji: '🔥', count: 5 }],
-      createdAt: new Date(Date.now() - 10800000),
-    },
-  ]);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null);
+  const [newStoryText, setNewStoryText] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showViewer, setShowViewer] = useState(false);
-  const [viewerIndex, setViewerIndex] = useState(0);
+  useEffect(() => {
+    const loadStories = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/stories', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-  const handleCreateStory = (
-    type: 'text' | 'image' | 'video',
-    content?: string,
-    mediaUrl?: string
-  ) => {
-    const newStory: Story = {
-      id: String(stories.length + 1),
-      username: 'yourname',
-      displayName: 'Вы',
-      avatar: '👤',
-      type,
-      content,
-      mediaUrl,
-      viewCount: 0,
-      isViewed: true,
-      reactions: [],
-      createdAt: new Date(),
+        if (!res.ok) throw new Error('Failed to load stories');
+
+        const data = await res.json();
+        setStories(data);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Failed to load stories:', error);
+        setIsLoading(false);
+      }
     };
-    setStories([newStory, ...stories]);
+
+    loadStories();
+  }, []);
+
+  const handleCreateStory = async () => {
+    if (!newStoryText.trim()) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/stories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          content: newStoryText,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to create story');
+
+      const newStory = await res.json();
+      setStories([newStory, ...stories]);
+      setNewStoryText('');
+      setShowCreateForm(false);
+    } catch (error) {
+      console.error('Failed to create story:', error);
+    }
   };
 
-  const handleViewStory = (index: number) => {
-    setViewerIndex(index);
-    setShowViewer(true);
-    // Mark as viewed
-    setStories(stories.map((s, i) => (i === index ? { ...s, isViewed: true } : s)));
+  const handleViewStory = async (story: Story) => {
+    setSelectedStory(story);
+
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`/api/stories/${story.id}/view`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (error) {
+      console.error('Failed to mark story as viewed:', error);
+    }
   };
 
-  const handleReactToStory = (storyId: string, emoji: string) => {
-    setStories(
-      stories.map((s) => {
-        if (s.id === storyId) {
-          const reactions = [...(s.reactions || [])];
-          const existing = reactions.find((r) => r.emoji === emoji);
-          if (existing) {
-            existing.count += 1;
-          } else {
-            reactions.push({ emoji, count: 1 });
-          }
-          return { ...s, reactions };
-        }
-        return s;
-      })
+  const isStoryExpired = (expiresAt: string) => {
+    return new Date(expiresAt) < new Date();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-telegram-text-secondary">Загружаем истории...</p>
+      </div>
     );
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-neutral-950 flex flex-col">
-      {/* Header */}
-      <div className="bg-neutral-900 border-b border-neutral-800 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Истории</h1>
+    <div className="min-h-screen bg-white">
+      {selectedStory ? (
+        // Story Viewer
+        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+          {/* Progress Bar */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gray-700">
+            <div className="h-full bg-white w-1/3 animate-pulse"></div>
+          </div>
+
+          {/* Close Button */}
           <button
-            onClick={() => setShowCreateDialog(true)}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium"
+            onClick={() => setSelectedStory(null)}
+            className="absolute top-4 right-4 text-white text-2xl hover:opacity-80 transition"
           >
-            + Моя история
+            ✕
+          </button>
+
+          {/* Story Content */}
+          <div className="w-full max-w-2xl h-screen md:h-auto md:aspect-video bg-gray-900 flex items-center justify-center relative">
+            {selectedStory.mediaUrl ? (
+              selectedStory.mediaType === 'video' ? (
+                <video
+                  src={selectedStory.mediaUrl}
+                  autoPlay
+                  controls
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <img
+                  src={selectedStory.mediaUrl}
+                  alt="Story"
+                  className="w-full h-full object-cover"
+                />
+              )
+            ) : (
+              <div className="text-center">
+                <p className="text-white text-2xl">{selectedStory.content}</p>
+              </div>
+            )}
+
+            {/* Story Info Overlay */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-telegram-blue flex items-center justify-center text-white font-bold flex-shrink-0">
+                  {selectedStory.userName.charAt(0).toUpperCase()}
+                </div>
+                <div className="text-white flex-1">
+                  <p className="font-semibold">{selectedStory.userName}</p>
+                  <p className="text-xs opacity-75">👁️ {selectedStory.views} просмотров</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <button className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-3xl hover:opacity-80 transition">
+            ‹
+          </button>
+          <button className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-3xl hover:opacity-80 transition">
+            ›
           </button>
         </div>
+      ) : (
+        // Stories Grid
+        <div className="max-w-6xl mx-auto p-4">
+          <h1 className="text-3xl font-bold text-telegram-text mb-6">Истории</h1>
 
-        <p className="text-sm text-neutral-400">
-          Временный контент, исчезающий через 24 часа
-        </p>
-      </div>
-
-      {/* Stories Grid */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {stories.length === 0 ? (
-            <div className="col-span-full text-center py-12">
-              <p className="text-neutral-400">Нет историй</p>
+          {/* Create Story Card */}
+          {!showCreateForm ? (
+            <div className="mb-6">
               <button
-                onClick={() => setShowCreateDialog(true)}
-                className="mt-4 text-primary-400 hover:text-primary-300 transition-colors"
+                onClick={() => setShowCreateForm(true)}
+                className="w-full p-6 rounded-lg border-2 border-dashed border-telegram-border hover:border-telegram-blue transition"
               >
-                Создать первую историю
+                <div className="text-center">
+                  <p className="text-3xl mb-2">➕</p>
+                  <p className="text-telegram-text font-semibold">Добавить историю</p>
+                </div>
               </button>
             </div>
           ) : (
-            stories.map((story, index) => (
-              <div
-                key={story.id}
-                onClick={() => handleViewStory(index)}
-                className="cursor-pointer"
-              >
-                <StoryCard
-                  {...story}
-                  onReact={(emoji) => handleReactToStory(story.id, emoji)}
+            <div className="bg-telegram-bg-hover p-6 rounded-lg mb-6 border border-telegram-border">
+              <h2 className="text-lg font-semibold text-telegram-text mb-4">Новая история</h2>
+              <div className="space-y-4">
+                <textarea
+                  value={newStoryText}
+                  onChange={(e) => setNewStoryText(e.target.value)}
+                  placeholder="Что-то на уме?"
+                  className="w-full px-4 py-3 border border-telegram-border rounded-lg focus:outline-none focus:border-telegram-blue resize-none"
+                  rows={4}
                 />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreateStory}
+                    className="bg-telegram-blue text-white px-6 py-2 rounded-lg hover:bg-telegram-accent transition font-semibold"
+                  >
+                    Опубликовать
+                  </button>
+                  <button
+                    onClick={() => setShowCreateForm(false)}
+                    className="bg-telegram-bg-hover text-telegram-text px-6 py-2 rounded-lg hover:bg-telegram-border transition border border-telegram-border"
+                  >
+                    Отмена
+                  </button>
+                </div>
               </div>
-            ))
+            </div>
           )}
+
+          {/* Stories Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {stories.length === 0 ? (
+              <div className="col-span-full text-center py-12">
+                <p className="text-telegram-text-secondary">Нет историй</p>
+              </div>
+            ) : (
+              stories.map((story) => {
+                const isExpired = isStoryExpired(story.expiresAt);
+                return (
+                  <div
+                    key={story.id}
+                    onClick={() => !isExpired && handleViewStory(story)}
+                    className={`relative rounded-lg overflow-hidden cursor-pointer transition transform hover:scale-105 ${
+                      isExpired ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {/* Story Thumbnail */}
+                    {story.mediaUrl ? (
+                      <div className="aspect-video bg-gray-300 relative">
+                        <img
+                          src={story.mediaUrl}
+                          alt={`Story by ${story.userName}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {isExpired && (
+                          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                            <p className="text-white font-semibold">Истекла</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="aspect-video bg-gradient-to-br from-telegram-blue to-telegram-accent flex items-center justify-center p-4">
+                        <p className="text-white text-center text-sm break-words line-clamp-4">
+                          {story.content}
+                        </p>
+                        {isExpired && (
+                          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                            <p className="text-white font-semibold">Истекла</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* User Info Badge */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-telegram-blue flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {story.userName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-semibold truncate">{story.userName}</p>
+                          <p className="text-white text-xs opacity-75">
+                            {!story.isViewed ? '●' : '○'} {story.views}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Unviewed Indicator */}
+                    {!story.isViewed && (
+                      <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-telegram-blue"></div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
-      </div>
-
-      {/* Story Viewer */}
-      <StoryViewer
-        isOpen={showViewer}
-        stories={stories}
-        currentIndex={viewerIndex}
-        onClose={() => setShowViewer(false)}
-        onNext={() => setViewerIndex(Math.min(viewerIndex + 1, stories.length - 1))}
-        onPrev={() => setViewerIndex(Math.max(viewerIndex - 1, 0))}
-        onReact={handleReactToStory}
-      />
-
-      {/* Create Story Dialog */}
-      <CreateStoryDialog
-        isOpen={showCreateDialog}
-        onClose={() => setShowCreateDialog(false)}
-        onCreate={handleCreateStory}
-      />
+      )}
     </div>
   );
 }

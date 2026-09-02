@@ -1,136 +1,179 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import jwt from 'jsonwebtoken';
-import { query, execute } from '@basagram/database';
+import mysql from 'mysql2/promise';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+let pool: mysql.Pool;
 
-// Create story
-router.post('/', async (req: Request, res: Response) => {
+const getPool = async () => {
+  if (!pool) {
+    const getDatabaseConfig = () => {
+      if (process.env.DATABASE_URL) {
+        try {
+          const url = new URL(process.env.DATABASE_URL);
+          return {
+            host: url.hostname,
+            port: parseInt(url.port || '3306'),
+            user: url.username,
+            password: url.password,
+            database: url.pathname.slice(1),
+          };
+        } catch (e) {
+          console.error('Failed to parse DATABASE_URL:', e);
+        }
+      }
+
+      return {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '3306'),
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'basagram',
+      };
+    };
+
+    const config = getDatabaseConfig();
+    pool = mysql.createPool({
+      ...config,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+  }
+  return pool;
+};
+
+const dbQuery = async <T = any>(sql: string, params?: any[]): Promise<T[]> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const [rows] = await connection.query(sql, params || []);
+    return rows as T[];
+  } finally {
+    connection.release();
+  }
+};
+
+const dbExecute = async (sql: string, params?: any[]): Promise<any> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
+  try {
+    const [result] = await connection.execute(sql, params || []);
+    return result;
+  } finally {
+    connection.release();
+  }
+};
+
+// Get all stories (not expired)
+router.get('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    if (!userId) {
       return res.status(401).json({ error: 'Требуется авторизация' });
     }
 
-    const token = authHeader.slice(7);
-    let userId: string;
+    const stories = await dbQuery<any>(
+      `SELECT
+        s.id,
+        s.user_id,
+        u.display_name as user_name,
+        u.avatar_url as user_avatar,
+        s.content,
+        s.media_url,
+        s.media_type,
+        COUNT(DISTINCT sv.id) as views,
+        MAX(CASE WHEN sv.user_id = ? THEN 1 ELSE 0 END) as is_viewed,
+        DATE_ADD(s.created_at, INTERVAL 24 HOUR) as expires_at,
+        s.created_at
+      FROM stories s
+      LEFT JOIN users u ON u.id = s.user_id
+      LEFT JOIN story_views sv ON sv.story_id = s.id
+      WHERE s.created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+      GROUP BY s.id
+      ORDER BY s.created_at DESC`,
+      [userId]
+    );
 
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
+    res.json(
+      stories.map((story) => ({
+        id: story.id,
+        userId: story.user_id,
+        userName: story.user_name,
+        userAvatar: story.user_avatar,
+        content: story.content,
+        mediaUrl: story.media_url,
+        mediaType: story.media_type,
+        views: story.views || 0,
+        isViewed: story.is_viewed === 1,
+        expiresAt: story.expires_at,
+        createdAt: story.created_at,
+      }))
+    );
+  } catch (error) {
+    console.error('[Stories Get] Error:', error);
+    res.status(500).json({ error: 'Ошибка при загрузке историй' });
+  }
+});
 
-    const { type, content, mediaUrl } = req.body;
-
-    if (!type || !['text', 'image', 'video'].includes(type)) {
-      return res.status(400).json({ error: 'type должен быть text, image или video' });
-    }
+// Create story
+router.post('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { content, mediaUrl, mediaType } = req.body;
 
     if (!content && !mediaUrl) {
-      return res.status(400).json({ error: 'Требуется content или mediaUrl' });
+      return res.status(400).json({ error: 'Требуется содержимое или медиа' });
     }
 
     const storyId = uuidv4();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 19)
-      .replace('T', ' ');
-
-    await execute(
-      `INSERT INTO stories
-       (id, user_id, type, content, media_url, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [storyId, userId, type, content || null, mediaUrl || null, expiresAt]
+    await dbExecute(
+      `INSERT INTO stories (id, user_id, content, media_url, media_type)
+       VALUES (?, ?, ?, ?, ?)`,
+      [storyId, userId, content || null, mediaUrl || null, mediaType || null]
     );
 
-    const story = await query('SELECT * FROM stories WHERE id = ?', [storyId]);
+    const user = await dbQuery<any>(
+      `SELECT display_name, avatar_url FROM users WHERE id = ?`,
+      [userId]
+    );
 
     res.status(201).json({
-      ...story[0],
-      viewCount: 0,
-      reactions: [],
+      id: storyId,
+      userId,
+      userName: user[0]?.display_name || 'Unknown',
+      userAvatar: user[0]?.avatar_url,
+      content,
+      mediaUrl: mediaUrl || null,
+      mediaType: mediaType || null,
+      views: 0,
       isViewed: false,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Create story error:', error);
+    console.error('[Story Create] Error:', error);
     res.status(500).json({ error: 'Ошибка при создании истории' });
   }
 });
 
-// Get user stories
-router.get('/user/:userId', async (req: Request, res: Response) => {
+// Mark story as viewed
+router.post('/:storyId/view', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
-
-    const stories = await query(
-      `SELECT * FROM stories
-       WHERE user_id = ? AND expires_at > NOW()
-       ORDER BY created_at DESC`,
-      [userId]
-    );
-
-    const storiesWithDetails = await Promise.all(
-      stories.map(async (s: any) => {
-        const views = await query(
-          'SELECT COUNT(*) as count FROM story_views WHERE story_id = ?',
-          [s.id]
-        );
-        const reactions = await query(
-          `SELECT emoji, COUNT(*) as count
-           FROM story_reactions
-           WHERE story_id = ?
-           GROUP BY emoji`,
-          [s.id]
-        );
-        return {
-          ...s,
-          viewCount: views[0].count,
-          reactions,
-        };
-      })
-    );
-
-    res.json(storiesWithDetails);
-  } catch (error) {
-    console.error('Get user stories error:', error);
-    res.status(500).json({ error: 'Ошибка при получении историй' });
-  }
-});
-
-// View story
-router.post('/:storyId/view', async (req: Request, res: Response) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
+    const userId = (req as any).userId;
     const { storyId } = req.params;
 
-    // Check if already viewed
-    const existing = await query(
-      'SELECT id FROM story_views WHERE story_id = ? AND viewer_id = ?',
+    const existing = await dbQuery<any>(
+      `SELECT id FROM story_views
+       WHERE story_id = ? AND user_id = ?`,
       [storyId, userId]
     );
 
     if (existing.length === 0) {
-      await execute(
-        `INSERT INTO story_views (id, story_id, viewer_id)
+      await dbExecute(
+        `INSERT INTO story_views (id, story_id, user_id)
          VALUES (?, ?, ?)`,
         [uuidv4(), storyId, userId]
       );
@@ -138,188 +181,27 @@ router.post('/:storyId/view', async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('View story error:', error);
-    res.status(500).json({ error: 'Ошибка при просмотре истории' });
-  }
-});
-
-// Add reaction to story
-router.post('/:storyId/reactions', async (req: Request, res: Response) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const { storyId } = req.params;
-    const { emoji } = req.body;
-
-    if (!emoji) {
-      return res.status(400).json({ error: 'emoji не предоставлен' });
-    }
-
-    // Check if reaction already exists
-    const existing = await query(
-      `SELECT id FROM story_reactions
-       WHERE story_id = ? AND user_id = ? AND emoji = ?`,
-      [storyId, userId, emoji]
-    );
-
-    if (existing.length > 0) {
-      // Remove reaction if already exists
-      await execute(
-        `DELETE FROM story_reactions
-         WHERE story_id = ? AND user_id = ? AND emoji = ?`,
-        [storyId, userId, emoji]
-      );
-      return res.json({ action: 'removed' });
-    }
-
-    // Add new reaction
-    await execute(
-      `INSERT INTO story_reactions (id, story_id, user_id, emoji)
-       VALUES (?, ?, ?, ?)`,
-      [uuidv4(), storyId, userId, emoji]
-    );
-
-    res.status(201).json({ action: 'added' });
-  } catch (error) {
-    console.error('Add reaction error:', error);
-    res.status(500).json({ error: 'Ошибка при добавлении реакции' });
-  }
-});
-
-// Get story views
-router.get('/:storyId/views', async (req: Request, res: Response) => {
-  try {
-    const { storyId } = req.params;
-
-    const views = await query(
-      `SELECT u.id, u.username, u.display_name, u.avatar_url, sv.viewed_at
-       FROM story_views sv
-       JOIN users u ON sv.viewer_id = u.id
-       WHERE sv.story_id = ?
-       ORDER BY sv.viewed_at DESC`,
-      [storyId]
-    );
-
-    res.json(views);
-  } catch (error) {
-    console.error('Get views error:', error);
-    res.status(500).json({ error: 'Ошибка при получении просмотров' });
+    console.error('[Story View] Error:', error);
+    res.status(500).json({ error: 'Ошибка при отметке просмотра' });
   }
 });
 
 // Delete story
-router.delete('/:storyId', async (req: Request, res: Response) => {
+router.delete('/:storyId', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
+    const userId = (req as any).userId;
     const { storyId } = req.params;
 
-    // Verify ownership
-    const story = await query(
-      'SELECT user_id FROM stories WHERE id = ?',
-      [storyId]
+    await dbExecute(
+      `DELETE FROM stories
+       WHERE id = ? AND user_id = ?`,
+      [storyId, userId]
     );
-
-    if (story.length === 0 || story[0].user_id !== userId) {
-      return res.status(403).json({ error: 'Доступ запрещен' });
-    }
-
-    await execute('DELETE FROM stories WHERE id = ?', [storyId]);
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Delete story error:', error);
+    console.error('[Story Delete] Error:', error);
     res.status(500).json({ error: 'Ошибка при удалении истории' });
-  }
-});
-
-// Get stories feed (for current user's followers)
-router.get('/feed', async (req: Request, res: Response) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    // Get stories from contacts
-    const stories = await query(
-      `SELECT s.*, u.username, u.display_name, u.avatar_url
-       FROM stories s
-       JOIN users u ON s.user_id = u.id
-       WHERE (s.user_id = ? OR s.user_id IN (
-         SELECT contact_user_id FROM contacts WHERE user_id = ? AND status = 'accepted'
-       ))
-       AND s.expires_at > NOW()
-       ORDER BY s.created_at DESC`,
-      [userId, userId]
-    );
-
-    const storiesWithDetails = await Promise.all(
-      stories.map(async (s: any) => {
-        const views = await query(
-          'SELECT COUNT(*) as count FROM story_views WHERE story_id = ?',
-          [s.id]
-        );
-        const isViewed = await query(
-          'SELECT id FROM story_views WHERE story_id = ? AND viewer_id = ?',
-          [s.id, userId]
-        );
-        const reactions = await query(
-          `SELECT emoji, COUNT(*) as count
-           FROM story_reactions
-           WHERE story_id = ?
-           GROUP BY emoji`,
-          [s.id]
-        );
-        return {
-          ...s,
-          viewCount: views[0].count,
-          isViewed: isViewed.length > 0,
-          reactions,
-        };
-      })
-    );
-
-    res.json(storiesWithDetails);
-  } catch (error) {
-    console.error('Get feed error:', error);
-    res.status(500).json({ error: 'Ошибка при получении ленты' });
   }
 });
 

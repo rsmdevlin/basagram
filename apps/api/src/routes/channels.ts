@@ -1,315 +1,335 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import jwt from 'jsonwebtoken';
-import { query, execute } from '@basagram/database';
+import mysql from 'mysql2/promise';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+let pool: mysql.Pool;
 
-// Create channel
-router.post('/', async (req: Request, res: Response) => {
+const getPool = async () => {
+  if (!pool) {
+    const getDatabaseConfig = () => {
+      if (process.env.DATABASE_URL) {
+        try {
+          const url = new URL(process.env.DATABASE_URL);
+          return {
+            host: url.hostname,
+            port: parseInt(url.port || '3306'),
+            user: url.username,
+            password: url.password,
+            database: url.pathname.slice(1),
+          };
+        } catch (e) {
+          console.error('Failed to parse DATABASE_URL:', e);
+        }
+      }
+
+      return {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '3306'),
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'basagram',
+      };
+    };
+
+    const config = getDatabaseConfig();
+    pool = mysql.createPool({
+      ...config,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+  }
+  return pool;
+};
+
+const dbQuery = async <T = any>(sql: string, params?: any[]): Promise<T[]> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const [rows] = await connection.query(sql, params || []);
+    return rows as T[];
+  } finally {
+    connection.release();
+  }
+};
+
+const dbExecute = async (sql: string, params?: any[]): Promise<any> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
+  try {
+    const [result] = await connection.execute(sql, params || []);
+    return result;
+  } finally {
+    connection.release();
+  }
+};
+
+// Get all channels for user
+router.get('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    if (!userId) {
       return res.status(401).json({ error: 'Требуется авторизация' });
     }
 
-    const token = authHeader.slice(7);
-    let userId: string;
+    const channels = await dbQuery<any>(
+      `SELECT
+        c.id,
+        c.name,
+        c.description,
+        c.avatar_url,
+        c.is_public,
+        c.creator_id,
+        COUNT(DISTINCT cu.user_id) as subscribers_count,
+        c.created_at
+      FROM channels c
+      LEFT JOIN channel_subscribers cu ON cu.channel_id = c.id
+      WHERE c.is_public = TRUE OR c.creator_id = ?
+      GROUP BY c.id
+      ORDER BY c.created_at DESC`,
+      [userId]
+    );
 
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
+    res.json(
+      channels.map((ch) => ({
+        id: ch.id,
+        name: ch.name,
+        description: ch.description,
+        avatar: ch.avatar_url,
+        isPublic: ch.is_public,
+        subscribersCount: ch.subscribers_count || 0,
+        createdAt: ch.created_at,
+      }))
+    );
+  } catch (error) {
+    console.error('[Channels Get] Error:', error);
+    res.status(500).json({ error: 'Ошибка при загрузке каналов' });
+  }
+});
 
-    const { name, description, isPrivate } = req.body;
+// Create channel
+router.post('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { name, description, isPublic } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ error: 'name не предоставлено' });
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Требуется название канала' });
     }
 
     const channelId = uuidv4();
-    await execute(
-      `INSERT INTO conversations
-       (id, name, type, created_by_id)
-       VALUES (?, ?, 'channel', ?)`,
-      [channelId, name, userId]
+    await dbExecute(
+      `INSERT INTO channels (id, name, description, creator_id, is_public)
+       VALUES (?, ?, ?, ?, ?)`,
+      [channelId, name.trim(), description || null, userId, isPublic !== false]
     );
 
-    // Add creator as admin/owner
-    await execute(
-      `INSERT INTO conversation_members
-       (id, conversation_id, user_id, role)
-       VALUES (?, ?, ?, 'admin')`,
-      [uuidv4(), channelId, userId]
+    // Add creator as first subscriber/admin
+    await dbExecute(
+      `INSERT INTO channel_subscribers (id, channel_id, user_id, role)
+       VALUES (?, ?, ?, ?)`,
+      [uuidv4(), channelId, userId, 'admin']
     );
 
     res.status(201).json({
       id: channelId,
       name,
-      description,
-      type: 'channel',
-      isPrivate: isPrivate || false,
-      createdBy: userId,
-      subscriberCount: 1,
+      description: description || null,
+      isPublic: isPublic !== false,
+      subscribersCount: 1,
+      createdAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Create channel error:', error);
+    console.error('[Channel Create] Error:', error);
     res.status(500).json({ error: 'Ошибка при создании канала' });
   }
 });
 
-// Get channel info
-router.get('/:channelId', async (req: Request, res: Response) => {
+// Get channel details
+router.get('/:channelId', requireAuth, async (req: Request, res: Response) => {
   try {
     const { channelId } = req.params;
 
-    const channels = await query(
-      'SELECT * FROM conversations WHERE id = ? AND type = ?',
-      [channelId, 'channel']
-    );
-
-    if (channels.length === 0) {
-      return res.status(404).json({ error: 'Канал не найден' });
-    }
-
-    const subscribers = await query(
-      'SELECT COUNT(*) as count FROM conversation_members WHERE conversation_id = ?',
+    const channel = await dbQuery<any>(
+      `SELECT
+        c.id,
+        c.name,
+        c.description,
+        c.avatar_url,
+        c.is_public,
+        c.creator_id,
+        COUNT(DISTINCT cu.user_id) as subscribers_count,
+        c.created_at
+      FROM channels c
+      LEFT JOIN channel_subscribers cu ON cu.channel_id = c.id
+      WHERE c.id = ?
+      GROUP BY c.id`,
       [channelId]
     );
 
+    if (!channel.length) {
+      return res.status(404).json({ error: 'Канал не найден' });
+    }
+
+    const ch = channel[0];
     res.json({
-      ...channels[0],
-      subscriberCount: subscribers[0].count,
+      id: ch.id,
+      name: ch.name,
+      description: ch.description,
+      avatar: ch.avatar_url,
+      isPublic: ch.is_public,
+      creatorId: ch.creator_id,
+      subscribersCount: ch.subscribers_count || 0,
+      createdAt: ch.created_at,
     });
   } catch (error) {
-    console.error('Get channel error:', error);
-    res.status(500).json({ error: 'Ошибка при получении канала' });
-  }
-});
-
-// Search channels
-router.get('/search/:query', async (req: Request, res: Response) => {
-  try {
-    const { query: searchQuery } = req.params;
-
-    const results = await query(
-      `SELECT c.*, COUNT(cm.user_id) as subscriber_count
-       FROM conversations c
-       LEFT JOIN conversation_members cm ON c.id = cm.conversation_id
-       WHERE c.type = 'channel' AND c.name LIKE ?
-       GROUP BY c.id
-       LIMIT 20`,
-      [`%${searchQuery}%`]
-    );
-
-    res.json(
-      results.map((c: any) => ({
-        ...c,
-        subscriberCount: c.subscriber_count,
-      }))
-    );
-  } catch (error) {
-    console.error('Search channels error:', error);
-    res.status(500).json({ error: 'Ошибка при поиске каналов' });
+    console.error('[Channel Get] Error:', error);
+    res.status(500).json({ error: 'Ошибка при загрузке канала' });
   }
 });
 
 // Subscribe to channel
-router.post('/:channelId/subscribe', async (req: Request, res: Response) => {
+router.post('/:channelId/subscribe', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
+    const userId = (req as any).userId;
     const { channelId } = req.params;
 
-    // Check if already subscribed
-    const existing = await query(
-      'SELECT id FROM conversation_members WHERE conversation_id = ? AND user_id = ?',
+    const existing = await dbQuery<any>(
+      `SELECT id FROM channel_subscribers
+       WHERE channel_id = ? AND user_id = ?`,
       [channelId, userId]
     );
 
     if (existing.length > 0) {
-      return res.status(400).json({ error: 'Вы уже подписаны на этот канал' });
+      return res.status(400).json({ error: 'Уже подписаны на этот канал' });
     }
 
-    await execute(
-      `INSERT INTO conversation_members
-       (id, conversation_id, user_id, role)
-       VALUES (?, ?, ?, 'member')`,
-      [uuidv4(), channelId, userId]
+    await dbExecute(
+      `INSERT INTO channel_subscribers (id, channel_id, user_id, role)
+       VALUES (?, ?, ?, ?)`,
+      [uuidv4(), channelId, userId, 'member']
     );
 
-    res.status(201).json({ success: true });
+    res.json({ success: true });
   } catch (error) {
-    console.error('Subscribe error:', error);
-    res.status(500).json({ error: 'Ошибка при подписке' });
+    console.error('[Channel Subscribe] Error:', error);
+    res.status(500).json({ error: 'Ошибка при подписке на канал' });
   }
 });
 
 // Unsubscribe from channel
-router.post('/:channelId/unsubscribe', async (req: Request, res: Response) => {
+router.post('/:channelId/unsubscribe', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
+    const userId = (req as any).userId;
     const { channelId } = req.params;
 
-    await execute(
-      'DELETE FROM conversation_members WHERE conversation_id = ? AND user_id = ?',
-      [channelId, userId]
+    await dbExecute(
+      `DELETE FROM channel_subscribers
+       WHERE channel_id = ? AND user_id = ? AND role != ?`,
+      [channelId, userId, 'admin']
     );
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Unsubscribe error:', error);
-    res.status(500).json({ error: 'Ошибка при отписке' });
+    console.error('[Channel Unsubscribe] Error:', error);
+    res.status(500).json({ error: 'Ошибка при отписке от канала' });
   }
 });
 
-// Get channel subscribers
-router.get('/:channelId/subscribers', async (req: Request, res: Response) => {
+// Get channel posts
+router.get('/:channelId/posts', requireAuth, async (req: Request, res: Response) => {
   try {
     const { channelId } = req.params;
 
-    const subscribers = await query(
-      `SELECT u.id, u.username, u.display_name, u.avatar_url, cm.role
-       FROM conversation_members cm
-       JOIN users u ON cm.user_id = u.id
-       WHERE cm.conversation_id = ? AND cm.role IN ('admin', 'moderator')
-       ORDER BY cm.role DESC, u.display_name ASC`,
+    const posts = await dbQuery<any>(
+      `SELECT
+        p.id,
+        p.channel_id,
+        p.creator_id,
+        u.display_name as creator_name,
+        p.content,
+        p.created_at,
+        p.is_pinned,
+        COUNT(DISTINCT pr.id) as reactions_count
+      FROM channel_posts p
+      LEFT JOIN users u ON u.id = p.creator_id
+      LEFT JOIN post_reactions pr ON pr.post_id = p.id
+      WHERE p.channel_id = ? AND p.is_deleted = FALSE
+      GROUP BY p.id
+      ORDER BY p.is_pinned DESC, p.created_at DESC`,
       [channelId]
     );
 
-    res.json(subscribers);
+    res.json(
+      posts.map((post) => ({
+        id: post.id,
+        channelId: post.channel_id,
+        creatorId: post.creator_id,
+        creatorName: post.creator_name,
+        content: post.content,
+        createdAt: post.created_at,
+        isPinned: post.is_pinned,
+        reactionsCount: post.reactions_count || 0,
+      }))
+    );
   } catch (error) {
-    console.error('Get subscribers error:', error);
-    res.status(500).json({ error: 'Ошибка при получении подписчиков' });
+    console.error('[Channel Posts Get] Error:', error);
+    res.status(500).json({ error: 'Ошибка при загрузке постов' });
   }
 });
 
-// Post to channel (admin/moderator only)
-router.post('/:channelId/posts', async (req: Request, res: Response) => {
+// Create channel post
+router.post('/:channelId/posts', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
+    const userId = (req as any).userId;
     const { channelId } = req.params;
     const { content } = req.body;
 
-    if (!content) {
-      return res.status(400).json({ error: 'content не предоставлен' });
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Пост не может быть пустым' });
     }
 
-    // Check if user is admin or moderator
-    const member = await query(
-      `SELECT role FROM conversation_members
-       WHERE conversation_id = ? AND user_id = ? AND role IN ('admin', 'moderator')`,
-      [channelId, userId]
+    const postId = uuidv4();
+    await dbExecute(
+      `INSERT INTO channel_posts (id, channel_id, creator_id, content)
+       VALUES (?, ?, ?, ?)`,
+      [postId, channelId, userId, content.trim()]
     );
 
-    if (member.length === 0) {
-      return res.status(403).json({ error: 'Только администраторы могут постить' });
-    }
-
-    const messageId = uuidv4();
-    await execute(
-      `INSERT INTO messages
-       (id, conversation_id, sender_id, content, status)
-       VALUES (?, ?, ?, ?, 'sent')`,
-      [messageId, channelId, userId, content]
-    );
-
-    const message = await query(
-      'SELECT * FROM messages WHERE id = ?',
-      [messageId]
-    );
-
-    res.status(201).json(message[0]);
+    res.status(201).json({
+      id: postId,
+      channelId,
+      creatorId: userId,
+      content: content.trim(),
+      createdAt: new Date().toISOString(),
+      isPinned: false,
+      reactionsCount: 0,
+    });
   } catch (error) {
-    console.error('Post error:', error);
-    res.status(500).json({ error: 'Ошибка при публикации' });
+    console.error('[Channel Post Create] Error:', error);
+    res.status(500).json({ error: 'Ошибка при создании поста' });
   }
 });
 
-// Delete channel (admin only)
-router.delete('/:channelId', async (req: Request, res: Response) => {
+// Delete channel post
+router.delete('/:channelId/posts/:postId', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
+    const userId = (req as any).userId;
+    const { postId } = req.params;
 
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const { channelId } = req.params;
-
-    // Check if user is creator/admin
-    const channel = await query(
-      'SELECT created_by_id FROM conversations WHERE id = ? AND type = ?',
-      [channelId, 'channel']
-    );
-
-    if (channel.length === 0 || channel[0].created_by_id !== userId) {
-      return res.status(403).json({ error: 'Доступ запрещен' });
-    }
-
-    await execute(
-      'UPDATE conversations SET is_archived = TRUE WHERE id = ?',
-      [channelId]
+    await dbExecute(
+      `UPDATE channel_posts SET is_deleted = TRUE, deleted_at = NOW()
+       WHERE id = ? AND creator_id = ?`,
+      [postId, userId]
     );
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Delete channel error:', error);
-    res.status(500).json({ error: 'Ошибка при удалении канала' });
+    console.error('[Channel Post Delete] Error:', error);
+    res.status(500).json({ error: 'Ошибка при удалении поста' });
   }
 });
 
