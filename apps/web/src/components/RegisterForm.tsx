@@ -11,7 +11,6 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -21,7 +20,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     setError(null);
 
     if (username.length < 3) {
-      setError('Имя пользователя должно быть минимум 3 символа');
+      setError('Имя пользователя минимум 3 символа');
       return;
     }
 
@@ -31,7 +30,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     }
 
     if (password.length < 8) {
-      setError('Пароль должен быть минимум 8 символов');
+      setError('Пароль минимум 8 символов');
       return;
     }
 
@@ -46,9 +45,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const response = await fetch(`${apiUrl}/api/auth/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username,
           email,
@@ -74,131 +71,106 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--tg-primary)] to-[var(--tg-primary-dark)] px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white bg-opacity-20 mb-4">
-            <span className="text-4xl">💬</span>
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Basagram</h1>
-          <p className="text-white text-opacity-80">Создайте аккаунт</p>
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-sm space-y-8">
+        {/* Header */}
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold text-center text-black">Telegram</h1>
+          <p className="text-center text-gray-500 text-sm">Создайте свой аккаунт</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-8 space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold text-[var(--tg-text)] mb-2">Начните общаться</h2>
-            <p className="text-[var(--tg-text-secondary)]">Присоединитесь к миллионам пользователей</p>
-          </div>
-
+        {/* Register Card */}
+        <div className="space-y-6">
           {success && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <p className="text-green-700 text-sm">✓ Аккаунт создан! Переводим на вход...</p>
+            <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+              <p className="text-green-700 text-sm">✓ Аккаунт создан! Переходим на вход...</p>
             </div>
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
               <p className="text-red-700 text-sm">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--tg-text)] mb-2">
-                Имя пользователя
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="your_username"
-                required
-                disabled={isLoading || success}
-                className="w-full px-4 py-3 rounded-lg border border-[var(--tg-border)] bg-[var(--tg-surface)] text-[var(--tg-text)] placeholder-[var(--tg-text-tertiary)] focus:border-[var(--tg-primary)] focus:ring-2 focus:ring-[var(--tg-primary)] focus:ring-opacity-20 outline-none transition-all disabled:opacity-50"
-              />
-              <p className="text-xs text-[var(--tg-text-tertiary)] mt-1">3-32 символа</p>
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {/* Username Input */}
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Имя пользователя"
+              required
+              disabled={isLoading || success}
+              className="w-full px-4 py-3 bg-gray-100 rounded-lg text-black placeholder-gray-500 outline-none focus:bg-gray-200 transition-colors disabled:opacity-50"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--tg-text)] mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                disabled={isLoading || success}
-                className="w-full px-4 py-3 rounded-lg border border-[var(--tg-border)] bg-[var(--tg-surface)] text-[var(--tg-text)] placeholder-[var(--tg-text-tertiary)] focus:border-[var(--tg-primary)] focus:ring-2 focus:ring-[var(--tg-primary)] focus:ring-opacity-20 outline-none transition-all disabled:opacity-50"
-              />
-            </div>
+            {/* Email Input */}
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              required
+              disabled={isLoading || success}
+              className="w-full px-4 py-3 bg-gray-100 rounded-lg text-black placeholder-gray-500 outline-none focus:bg-gray-200 transition-colors disabled:opacity-50"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--tg-text)] mb-2">
-                Пароль
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  disabled={isLoading || success}
-                  className="w-full px-4 py-3 rounded-lg border border-[var(--tg-border)] bg-[var(--tg-surface)] text-[var(--tg-text)] placeholder-[var(--tg-text-tertiary)] focus:border-[var(--tg-primary)] focus:ring-2 focus:ring-[var(--tg-primary)] focus:ring-opacity-20 outline-none transition-all disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={isLoading || success}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[var(--tg-text-secondary)] hover:text-[var(--tg-text)] disabled:opacity-50"
-                >
-                  {showPassword ? '👁️' : '👁️‍🗨️'}
-                </button>
-              </div>
-              <p className="text-xs text-[var(--tg-text-tertiary)] mt-1">Минимум 8 символов</p>
-            </div>
+            {/* Password Input */}
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Пароль"
+              required
+              disabled={isLoading || success}
+              className="w-full px-4 py-3 bg-gray-100 rounded-lg text-black placeholder-gray-500 outline-none focus:bg-gray-200 transition-colors disabled:opacity-50"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--tg-text)] mb-2">
-                Подтвердите пароль
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                disabled={isLoading || success}
-                className="w-full px-4 py-3 rounded-lg border border-[var(--tg-border)] bg-[var(--tg-surface)] text-[var(--tg-text)] placeholder-[var(--tg-text-tertiary)] focus:border-[var(--tg-primary)] focus:ring-2 focus:ring-[var(--tg-primary)] focus:ring-opacity-20 outline-none transition-all disabled:opacity-50"
-              />
-            </div>
+            {/* Confirm Password Input */}
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Повтор пароля"
+              required
+              disabled={isLoading || success}
+              className="w-full px-4 py-3 bg-gray-100 rounded-lg text-black placeholder-gray-500 outline-none focus:bg-gray-200 transition-colors disabled:opacity-50"
+            />
 
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading || success}
-              className="w-full px-4 py-3 rounded-lg bg-[var(--tg-primary)] text-white font-semibold hover:bg-[var(--tg-primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 mt-6 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
                   <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Создание аккаунта...
+                  Создание...
                 </>
               ) : success ? (
-                '✓ Аккаунт создан!'
+                '✓ Создано!'
               ) : (
                 'Создать аккаунт'
               )}
             </button>
           </form>
 
-          <div className="text-center pt-4 border-t border-[var(--tg-border)]">
-            <p className="text-[var(--tg-text-secondary)]">
+          {/* Divider */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1 h-px bg-gray-300"></div>
+            <span className="text-gray-400 text-sm">или</span>
+            <div className="flex-1 h-px bg-gray-300"></div>
+          </div>
+
+          {/* Sign In Link */}
+          <div className="text-center">
+            <p className="text-gray-600 text-sm">
               Уже есть аккаунт?{' '}
               <button
                 onClick={onSwitchToLogin}
-                className="text-[var(--tg-primary)] hover:text-[var(--tg-primary-hover)] font-semibold transition-colors"
+                className="text-blue-500 hover:text-blue-600 font-semibold transition-colors"
               >
                 Войти
               </button>
@@ -206,8 +178,9 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
           </div>
         </div>
 
-        <div className="text-center mt-8 text-white text-opacity-70 text-sm">
-          <p>Быстрое, простое и безопасное общение</p>
+        {/* Footer */}
+        <div className="text-center space-y-2 border-t border-gray-200 pt-6">
+          <p className="text-gray-500 text-xs">Быстро. Надежно. Безопасно.</p>
         </div>
       </div>
     </div>
