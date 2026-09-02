@@ -1,597 +1,246 @@
-Ты работаешь над моим проектом web-messenger и должен использовать локально клонированный исходный код Telegram Desktop как подробный UI/UX reference.
-
-Главная цель: полностью изучить локальный репозиторий Telegram Desktop — структуру UI, компоненты, стили, темы, цвета, размеры, состояния, иконки, анимации, переходы, TGS/Lottie-анимации и UX-поведение — а затем профессионально реализовать аналогичный по уровню качества Telegram-like интерфейс в моем WEB-мессенджере.
-
-ВАЖНО: не копируй Telegram слепо 1:1 и не превращай проект в прямой клон. Изучи реальные исходники Telegram Desktop, пойми принципы его интерфейса и поведения и перенеси их в мой проект современным веб-способом, сохранив собственный стиль проекта.
-
-1. СНАЧАЛА ОПРЕДЕЛИ ПРАВИЛЬНЫЕ ПУТИ
-
-Не делай никаких предположений о расположении файлов.
-
-Перед чтением файлов обязательно:
-
-Выведи текущую рабочую директорию.
-Найди реальную директорию моего web-messenger.
-Найди реальную директорию локального tdesktop.
-Сохрани абсолютные пути и используй только их.
-
-На Windows используй PowerShell-команды вроде:
-
-Get-Location
-Get-ChildItem "C:\Users\myteg\Desktop" -Directory
-Get-ChildItem "C:\Users\myteg\Desktop" -Directory -Recurse -Depth 2 |
-  Where-Object { $_.Name -eq "tdesktop" -or $_.Name -eq "web-messenger" } |
-  Select-Object FullName
-
-После обнаружения путей назначь их логически:
-
-TDESKTOP_ROOT=<реальный абсолютный путь к tdesktop>
-WEB_MESSENGER_ROOT=<реальный абсолютный путь к web-messenger>
-
-НИКОГДА больше не пытайся читать путь, которого не существует.
-
-Если Read сообщает File does not exist, не продолжай угадывать путь. Сначала найди файл через Get-ChildItem, Select-String, rg, fd или аналогичный поиск.
-
-2. НЕ ОГРАНИЧИВАЙСЯ ПАРОЙ ФАЙЛОВ
-
-Я хочу, чтобы ты реально исследовал Telegram Desktop систематически.
-
-Изучи как минимум:
-
-Telegram/SourceFiles/ui
-Telegram/SourceFiles/window
-Telegram/SourceFiles/history
-Telegram/SourceFiles/dialogs
-Telegram/SourceFiles/chat_helpers
-Telegram/SourceFiles/settings
-Telegram/SourceFiles/info
-Telegram/SourceFiles/profile
-Telegram/SourceFiles/boxes
-Telegram/SourceFiles/media
-Telegram/SourceFiles/data
-Telegram/Resources
-
-Также ищи по всему репозиторию:
-
-*.style
-*.h
-*.cpp
-*.json
-*.tgs
-*.svg
-*.webp
-*.png
-*.gif
-*.qrc
-
-Используй поиск по содержимому:
-
-rg -n "animation|animate|transition|opacity|scale|slide|fade|easing|duration" <TDESKTOP_ROOT>
-rg -n "message|bubble|history|chat|dialog|typing|online|unread|reaction" <TDESKTOP_ROOT>
-rg -n "palette|color|background|radius|font|padding|margin" <TDESKTOP_ROOT>
-
-Не читай случайные 150 строк одного файла и не заявляй после этого, что Telegram изучен.
-
-3. ПОСТРОЙ КАРТУ UI TELEGRAM DESKTOP
-
-Перед серьезными изменениями web-messenger составь для себя техническую карту Telegram Desktop:
-
-UI Area
-├─ Authorization
-├─ Main window
-├─ Left sidebar
-│  ├─ Search
-│  ├─ Dialog row
-│  ├─ Avatar
-│  ├─ Online status
-│  ├─ Unread badge
-│  └─ Context actions
-├─ Chat header
-├─ Message history
-│  ├─ incoming message
-│  ├─ outgoing message
-│  ├─ grouped messages
-│  ├─ reply
-│  ├─ reactions
-│  ├─ status/checkmarks
-│  ├─ media
-│  ├─ voice
-│  └─ service messages
-├─ Composer
-├─ Emoji/sticker/GIF panel
-├─ Search
-├─ Profile
-├─ Settings
-├─ Context menus
-├─ Modals
-├─ Tooltips
-├─ Mobile/responsive states
-└─ Animations/transitions
-
-Для каждого блока выясни:
-
-где находится реализация;
-какие стили используются;
-размеры;
-отступы;
-border-radius;
-цвета;
-hover;
-active;
-pressed;
-selected;
-disabled;
-focus;
-animation;
-duration;
-easing;
-enter/exit transition;
-keyboard/mouse behavior.
-4. ОБЯЗАТЕЛЬНО ИЗУЧАЙ .style
-
-Telegram Desktop использует собственную систему .style.
-
-Не относись к ней как к обычному CSS.
-
-Найди определения:
-
-palette;
-typography;
-dimensions;
-margins;
-padding;
-radii;
-icon sizes;
-row heights;
-message spacing;
-sidebar widths;
-header heights.
-
-Прослеживай связи между style-файлами и C++ компонентами.
-
-Если видишь что-то вроде:
-
-st::someStyle
-
-найди определение someStyle, а не угадывай его значение.
-
-5. TGS / LOTTIE — ОБЯЗАТЕЛЬНО
-
-Я хочу, чтобы ты умел исследовать .tgs.
-
-.tgs — это Telegram Animated Sticker / Lottie JSON, обычно сжатый gzip.
-
-Когда находишь .tgs, не говори, что формат неизвестен.
-
-На Windows можешь:
-
-Get-ChildItem <TDESKTOP_ROOT> -Recurse -Filter *.tgs
-
-Для анализа содержимого распаковывай его во временную директорию, не изменяя оригинал.
-
-Можно использовать Python:
-
-import gzip
-import json
-
-src = r"C:\path\animation.tgs"
-
-with gzip.open(src, "rt", encoding="utf-8") as f:
-    data = json.load(f)
-
-print(json.dumps(data, ensure_ascii=False, indent=2)[:20000])
-
-Из TGS анализируй:
-
-fr — framerate;
-ip / op — animation range;
-w / h;
-layers;
-transforms;
-opacity;
-scale;
-position;
-path animations;
-easing/keyframes;
-duration;
-loop behavior.
-
-Если анимация подходит для web, реализуй ее через:
-
-lottie-web, если это настоящая Lottie-анимация;
-CSS;
-SVG;
-Web Animations API;
-Framer Motion;
-React animation tools,
-
-выбирая наиболее подходящий вариант.
-
-Не конвертируй все TGS механически. Сначала выясни, для чего конкретная анимация используется в Telegram.
-
-6. SVG И ИКОНКИ
-
-Исследуй SVG и другие graphical assets.
-
-Для SVG анализируй:
-
-viewBox;
-paths;
-strokes;
-fills;
-opacity;
-transforms;
-masks;
-clip-path;
-stroke-linecap;
-stroke-linejoin.
-
-Если SVG является частью анимации, найди C++ код, который меняет его состояние.
-
-Для web создавай переиспользуемые React-компоненты и не вставляй сотни копий одного SVG.
-
-7. АНАЛИЗИРУЙ ИМЕННО ПОВЕДЕНИЕ, А НЕ ТОЛЬКО ВНЕШНИЙ ВИД
-
-Особенно изучи:
-
-появление нового сообщения;
-отправку сообщения;
-изменение статуса sent/read;
-typing indicator;
-unread counters;
-hover по сообщению;
-selection;
-right-click;
-context menu;
-replies;
-reactions;
-scroll-to-bottom;
-floating buttons;
-появление/скрытие sidebar;
-открытие профиля;
-opening/closing modal;
-переход chat list → conversation;
-search animations;
-skeleton/loading;
-empty states;
-online status;
-notification states.
-
-Особенно внимательно изучи animation timing.
-
-Мне не нужны грубые:
-
-transition: all .3s;
-
-Выбирай конкретные свойства:
-
-transition:
-  transform 160ms cubic-bezier(...),
-  opacity 140ms ease,
-  background-color 120ms ease;
-8. ИЗУЧИ TELEGRAM DESKTOP КАК СИСТЕМУ
-
-Ищи не только один конкретный экран.
-
-Мне нужны общие закономерности Telegram:
-
-visual hierarchy;
-density;
-spacing system;
-typography scale;
-surface hierarchy;
-shadows;
-separators;
-colors;
-accent behavior;
-selection;
-message grouping;
-unread state;
-muted chats;
-pinned chats;
-verified/status icons;
-avatars;
-profile panels;
-settings rows;
-contextual actions.
-
-На основе этого создай собственную цельную Design System для web-messenger.
-
-9. DESKTOP И MOBILE ДОЛЖНЫ БЫТЬ РАЗНЫМИ UX-СОСТОЯНИЯМИ
-
-Не просто уменьши desktop CSS.
-
-Desktop:
-
-sidebar + active conversation + optional info/profile panel
-
-Mobile:
-
-chat list
-    ↓
-opening animation
-    ↓
-full-screen conversation
-    ↓
-back gesture/button
-
-Реализуй адаптацию нормально.
-
-Tablet — промежуточное состояние.
-
-10. НЕ ЛОМАЙ WEB-ПОВЕДЕНИЕ
-
-Это WEB приложение.
-
-Не отключай глобально:
-
-preventDefault()
-
-для:
-
-LMB;
-выделения текста;
-input;
-ссылок;
-scroll;
-браузерных функций.
-
-Если нужен кастомный context-menu, ограничивай обработчик конкретной областью.
-
-Desktop должен оставаться нормальным веб-приложением.
-
-11. НЕ ПОДМЕНЯЙ BACKEND
-
-Мой backend, база данных, realtime и API уже существуют.
-
-Не создавай demo-data вместо настоящих данных.
-
-Перед изменениями выясни существующую архитектуру:
-
-auth;
-API client;
-Socket.IO/WebSocket;
-state management;
-current user;
-chats;
-messages;
-sender IDs;
-backend DTO/types.
-
-Сохраняй текущую функциональность.
-
-В частности убедись:
-
-message.sender_id === currentUser.id
-
-означает outgoing message.
-
-Не определяй направление сообщения по позиции, индексу или имени пользователя.
-
-12. НЕ ЛОМАЙСЯ ИЗ-ЗА БОЛЬШОГО РЕПОЗИТОРИЯ
-
-Не пытайся загрузить весь tdesktop в один context.
-
-Работай итеративно:
-
-DISCOVER
-    ↓
-INDEX
-    ↓
-FIND
-    ↓
-READ relevant files
-    ↓
-TRACE dependencies
-    ↓
-DOCUMENT findings internally
-    ↓
-IMPLEMENT
-    ↓
-VERIFY
-
-Используй rg/Get-ChildItem сначала, Read — потом.
-
-НИКОГДА:
-
-guessed path → Read
-guessed path → Read
-guessed path → Read
-13. ЕСЛИ ФАЙЛ БОЛЬШОЙ
-
-Не читай постоянно только lines 1-150.
-
-Сначала найди нужные символы:
-
-rg -n "SomeClass|SomeStyle|animation" file.cpp
-
-Потом читай диапазон вокруг совпадения.
-
-Если компонент разбит между .h, .cpp, .style, ресурсами — исследуй все связанные части.
-
-14. НЕ ОБЪЯВЛЯЙ PHASE COMPLETE БЕЗ РЕАЛЬНОЙ РАБОТЫ
-
-Запрещено писать:
-
-PHASE COMPLETE
-FULL RELEASE
-PRODUCTION READY
-Telegram UI completed
-
-если ты только:
-
-посмотрел несколько директорий;
-создал один CSS;
-сделал пару компонентов;
-не проверил остальные экраны.
-
-Статус задачи должен соответствовать фактически сделанной работе.
-
-15. ПОРЯДОК РАБОТЫ
-
-Работай в таком порядке:
-
-PHASE 0 — Environment/path discovery
-
-PHASE 1 — Telegram Desktop repository indexing
-
-PHASE 2 — Telegram design-system research
-
-PHASE 3 — Telegram animation/TGS/SVG research
-
-PHASE 4 — Existing web-messenger architecture analysis
-
-PHASE 5 — Global design-system implementation
-
-PHASE 6 — Auth screens
-
-PHASE 7 — Main application shell
-
-PHASE 8 — Chats sidebar
-
-PHASE 9 — Chat header
-
-PHASE 10 — Message system
-
-PHASE 11 — Composer
-
-PHASE 12 — Search
-
-PHASE 13 — Profiles
-
-PHASE 14 — Settings
-
-PHASE 15 — Context menus/modals
-
-PHASE 16 — Animations/microinteractions
-
-PHASE 17 — Responsive/mobile UX
-
-PHASE 18 — Real backend/realtime integration verification
-
-PHASE 19 — Final consistency/bug pass
-
-Не останавливайся после Foundation.
-
-Продолжай самостоятельно по следующим фазам.
-
-16. КАЧЕСТВО КОДА
-
-Не делай весь проект одним огромным компонентом.
-
-Создавай переиспользуемые компоненты вроде:
-
-Avatar
-IconButton
-SearchField
-ChatListItem
-UnreadBadge
-OnlineBadge
-ChatHeader
-MessageBubble
-MessageGroup
-MessageStatus
-TypingIndicator
-Composer
-ContextMenu
-Modal
-SettingsRow
-ProfilePanel
-AnimatedIcon
-
-Повторяемые значения вынеси в design tokens:
-
-colors
-spacing
-typography
-radii
-shadows
-durations
-easing
-z-index
-breakpoints
-17. СОЗДАЙ TELEGRAM RESEARCH NOTES В ПРОЕКТЕ
-
-Создай служебный файл, например:
-
-docs/telegram-ui-research.md
-
-Записывай туда найденные закономерности:
-
-Telegram source file
-Что реализует
-Какие параметры важны
-Как это переносится в web-messenger
-
-Но не трать всё время только на документацию — основная задача состоит в реализации.
-
-18. КАЖДЫЙ РАЗ, КОГДА ХОЧЕШЬ ЧТО-ТО СКОПИРОВАТЬ, СНАЧАЛА ПРОСЛЕДИ ИСТОЧНИК
-
-Например:
-
-Хочу повторить bubble animation
-↓
-найди history/message component
-↓
-найди style
-↓
-найди animation code
-↓
-найди related asset
-↓
-разберись, как они связаны
-↓
-только после этого реализуй web version
-
-Это важнейшее правило.
-
-19. НИКАКИХ ВЫДУМАННЫХ ФАЙЛОВ
-
-Никогда не пиши:
-
-Read C:\...\some_file.style
-
-пока поиском не доказал, что этот файл существует.
-
-Перед чтением незнакомого пути:
-
-Test-Path "ABSOLUTE_PATH"
-
-либо найди его через:
-
-Get-ChildItem ...
-20. В КОНЦЕ КАЖДОГО ЭТАПА
-
-Кратко сообщай:
-
-Examined:
-- реальные файлы
-
-Learned:
-- реальные выводы
-
-Changed:
-- реальные файлы моего проекта
-
-Remaining:
-- следующие задачи
-
-Никакой воды.
-
-МОЯ ГЛАВНАЯ КОМАНДА
-
-Не делай “пример Telegram”.
-
-Не делай “Telegram-inspired пару компонентов”.
-
-Не делай быстрый CSS makeover.
-
-Исследуй Telegram Desktop как настоящий инженер, включая C++/Qt UI, .style, ресурсы, TGS/Lottie, SVG, анимации и UX-состояния, и используй эти знания, чтобы последовательно переделать весь мой web-messenger от авторизации до настроек в полноценный современный Telegram-class web messenger.
-
-Начинай прямо сейчас с PHASE 0.
-
-Первое действие — определить точные абсолютные пути tdesktop и web-messenger.
-
-Не создавай ни одного UI-файла, пока эти пути не подтверждены.
-
-После подтверждения путей сразу переходи к индексированию tdesktop, не спрашивая меня разрешение на каждый файл.
+ 243 |   const validateForm = (): boolean => {
+ 244 |     if (!formData.username.trim()) {
+ 245 |       setError('Username is required');
+ 246 |       return false;
+ 247 |     }
+ 248 |     if (formData.username.length < 3) {
+ 249 |       setError('Username must be at least 3 characters');
+ 250 |       return false;
+ 251 |     }
+ 252 |     if (!formData.email.includes('@')) {
+ 253 |       setError('Please enter a valid email');
+ 254 |       return false;
+ 255 |     }
+ 256 |     if (formData.password.length < 8) {
+ 257 |       setError('Password must be at least 8 characters');
+ 258 |       return false;
+ 259 |     }
+ 260 |     if (formData.password !== formData.confirmPassword) {
+ 261 |       setError('Passwords do not match');
+ 262 |       return false;
+ 263 |     }
+ 264 |     return true;
+ 265 |   };
+ 266 | 
+ 267 |   const handleSubmit = async (e: React.FormEvent) => {
+ 268 |     e.preventDefault();
+ 269 | 
+ 270 |     if (!validateForm()) {
+ 271 |       return;
+ 272 |     }
+ 273 | 
+ 274 |     setIsLoading(true);
+ 275 |     setError(null);
+ 276 | 
+ 277 |     try {
+ 278 |       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/register`, {
+ 279 |         method: 'POST',
+ 280 |         headers: {
+ 281 |           'Content-Type': 'application/json',
+ 282 |         },
+ 283 |         body: JSON.stringify({
+ 284 |           username: formData.username,
+ 285 |           email: formData.email,
+ 286 |           password: formData.password,
+ 287 |         }),
+ 288 |       });
+ 289 | 
+ 290 |       if (!response.ok) {
+ 291 |         const data = await response.json();
+ 292 |         throw new Error(data.error || 'Registration failed');
+ 293 |       }
+ 294 | 
+ 295 |       setSuccess(true);
+ 296 | 
+ 297 |       // Redirect to login after 2 seconds
+ 298 |       setTimeout(() => {
+ 299 |         window.location.href = '/login';
+ 300 |       }, 2000);
+ 301 |     } catch (err) {
+ 302 |       setError(err instanceof Error ? err.message : 'An error occurred');
+ 303 |     } finally {
+ 304 |       setIsLoading(false);
+ 305 |     }
+ 306 |   };
+ 307 | 
+ 308 |   return (
+ 309 |     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--tg-primary)] to-[var(--tg-primary-dark)] px-4">
+ 310 |       <div className="w-full max-w-md">
+ 311 |         {/* Logo/Header */}
+ 312 |         <div className="text-center mb-8">
+ 313 |           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white bg-opacity-20 mb-4">
+ 314 |             <span className="text-4xl">💬</span>
+ 315 |           </div>
+ 316 |           <h1 className="text-3xl font-bold text-white mb-2">Basagram</h1>
+ 317 |           <p className="text-white text-opacity-80">Create Your Account</p>
+ 318 |         </div>
+ 319 | 
+ 320 |         {/* Register Card */}
+ 321 |         <div className="bg-white rounded-2xl shadow-2xl p-8 space-y-6">
+ 322 |           <div>
+ 323 |             <h2 className="text-2xl font-bold text-[var(--tg-text)] mb-2">Get started</h2>
+ 324 |             <p className="text-[var(--tg-text-secondary)]">Join millions of users</p>
+ 325 |           </div>
+ 326 | 
+ 327 |           {/* Success message */}
+ 328 |           {success && (
+ 329 |             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+ 330 |               <p className="text-green-700 text-sm">✓ Account created successfully! Redirecting to login...</p>
+ 331 |             </div>
+ 332 |           )}
+ 333 | 
+ 334 |           {/* Error message */}
+ 335 |           {error && (
+ 336 |             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+ 337 |               <p className="text-red-700 text-sm">{error}</p>
+ 338 |             </div>
+ 339 |           )}
+ 340 | 
+ 341 |           <form onSubmit={handleSubmit} className="space-y-4">
+ 342 |             {/* Username input */}
+ 343 |             <div>
+ 344 |               <label className="block text-sm font-medium text-[var(--tg-text)] mb-2">
+ 345 |                 Username
+ 346 |               </label>
+ 347 |               <input
+ 348 |                 type="text"
+ 349 |                 name="username"
+ 350 |                 value={formData.username}
+ 351 |                 onChange={handleChange}
+ 352 |                 placeholder="your_username"
+ 353 |                 required
+ 354 |                 className="w-full px-4 py-3 rounded-lg border border-[var(--tg-border)] bg-[var(--tg-surface)] text-[var(--tg-text)] placeholder-[var(--tg-text-tertiary)] focus:border-[var(--tg-primary)] focus:ring-2 focus:ring-[var(--tg-primary)] focus:ring-opacity-20 outline-none transition-all"
+ 355 |               />
+ 356 |               <p className="text-xs text-[var(--tg-text-tertiary)] mt-1">3-32 characters, letters and numbers only</p>
+ 357 |             </div>
+ 358 | 
+ 359 |             {/* Email input */}
+ 360 |             <div>
+ 361 |               <label className="block text-sm font-medium text-[var(--tg-text)] mb-2">
+ 362 |                 Email address
+ 363 |               </label>
+ 364 |               <input
+ 365 |                 type="email"
+ 366 |                 name="email"
+ 367 |                 value={formData.email}
+ 368 |                 onChange={handleChange}
+ 369 |                 placeholder="you@example.com"
+ 370 |                 required
+ 371 |                 className="w-full px-4 py-3 rounded-lg border border-[var(--tg-border)] bg-[var(--tg-surface)] text-[var(--tg-text)] placeholder-[var(--tg-text-tertiary)] focus:border-[var(--tg-primary)] focus:ring-2 focus:ring-[var(--tg-primary)] focus:ring-opacity-20 outline-none transition-all"
+ 372 |               />
+ 373 |             </div>
+ 374 | 
+ 375 |             {/* Password input */}
+ 376 |             <div>
+ 377 |               <label className="block text-sm font-medium text-[var(--tg-text)] mb-2">
+ 378 |                 Password
+ 379 |               </label>
+ 380 |               <div className="relative">
+ 381 |                 <input
+ 382 |                   type={showPassword ? 'text' : 'password'}
+ 383 |                   name="password"
+ 384 |                   value={formData.password}
+ 385 |                   onChange={handleChange}
+ 386 |                   placeholder="••••••••"
+ 387 |                   required
+ 388 |                   className="w-full px-4 py-3 rounded-lg border border-[var(--tg-border)] bg-[var(--tg-surface)] text-[var(--tg-text)] placeholder-[var(--tg-text-tertiary)] focus:border-[var(--tg-primary)] focus:ring-2 focus:ring-[var(--tg-primary)] focus:ring-opacity-20 outline-none transition-all"
+ 389 |                 />
+ 390 |                 <button
+ 391 |                   type="button"
+ 392 |                   onClick={() => setShowPassword(!showPassword)}
+ 393 |                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[var(--tg-text-secondary)] hover:text-[var(--tg-text)]"
+ 394 |                 >
+ 395 |                   {showPassword ? '👁️' : '👁️‍🗨️'}
+ 396 |                 </button>
+ 397 |               </div>
+ 398 |               <p className="text-xs text-[var(--tg-text-tertiary)] mt-1">At least 8 characters</p>
+ 399 |             </div>
+ 400 | 
+ 401 |             {/* Confirm password input */}
+ 402 |             <div>
+ 403 |               <label className="block text-sm font-medium text-[var(--tg-text)] mb-2">
+ 404 |                 Confirm password
+ 405 |               </label>
+ 406 |               <input
+ 407 |                 type="password"
+ 408 |                 name="confirmPassword"
+ 409 |                 value={formData.confirmPassword}
+ 410 |                 onChange={handleChange}
+ 411 |                 placeholder="••••••••"
+ 412 |                 required
+ 413 |                 className="w-full px-4 py-3 rounded-lg border border-[var(--tg-border)] bg-[var(--tg-surface)] text-[var(--tg-text)] placeholder-[var(--tg-text-tertiary)] focus:border-[var(--tg-primary)] focus:ring-2 focus:ring-[var(--tg-primary)] focus:ring-opacity-20 outline-none transition-all"
+ 414 |               />
+ 415 |             </div>
+ 416 | 
+ 417 |             {/* Terms agreement */}
+ 418 |             <div className="flex items-start gap-2">
+ 419 |               <input
+ 420 |                 type="checkbox"
+ 421 |                 id="agree"
+ 422 |                 required
+ 423 |                 className="w-4 h-4 rounded border-[var(--tg-border)] text-[var(--tg-primary)] focus:ring-[var(--tg-primary)] mt-1"
+ 424 |               />
+ 425 |               <label htmlFor="agree" className="text-sm text-[var(--tg-text-secondary)]">
+ 426 |                 I agree to the{' '}
+ 427 |                 <Link href="/terms" className="text-[var(--tg-primary)] hover:underline">
+ 428 |                   Terms of Service
+ 429 |                 </Link>
+ 430 |                 {' '}and{' '}
+ 431 |                 <Link href="/privacy" className="text-[var(--tg-primary)] hover:underline">
+ 432 |                   Privacy Policy
+ 433 |                 </Link>
+ 434 |               </label>
+ 435 |             </div>
+ 436 | 
+ 437 |             {/* Submit button */}
+ 438 |             <button
+ 439 |               type="submit"
+ 440 |               disabled={isLoading || success}
+ 441 |               className="w-full px-4 py-3 rounded-lg bg-[var(--tg-primary)] text-white font-semibold hover:bg-[var(--tg-primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+ 442 |             >
+ 443 |               {isLoading ? (
+ 444 |                 <>
+ 445 |                   <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+ 446 |                   Creating account...
+ 447 |                 </>
+ 448 |               ) : success ? (
+ 449 |                 '✓ Account created!'
+ 450 |               ) : (
+ 451 |                 'Create account'
+ 452 |               )}
+ 453 |             </button>
+ 454 |           </form>
+ 455 | 
+ 456 |           {/* Sign in link */}
+ 457 |           <div className="text-center pt-4 border-t border-[var(--tg-border)]">
+ 458 |             <p className="text-[var(--tg-text-secondary)]">
+ 459 |               Already have an account?{' '}
+ 460 |               <Link href="/login" className="text-[var(--tg-primary)] hover:text-[var(--tg-primary-hover)] font-semibold">
+ 461 |                 Sign in
+ 462 |               </Link>
+ 463 |             </p>
+ 464 |           </div>
+ 465 |         </div>
+ 466 | 
+ 467 |         {/* Footer */}
+ 468 |         <div className="text-center mt-8 text-white text-opacity-70 text-sm">
+ 469 |           <p>Fast, simple, secure messaging</p>
+ 470 |         </div>
+ 471 |       </div>
+ 472 |     </div>
+ 473 |   );
+ 474 | };
+ 475 | 
+ 476 | export default RegisterForm;
+     : ^^^^^^^^^^^^^^|^^^^^^^^^^^^^
+     :               `-- exported more than once
+     `----
+Error: 
+  > Exported identifiers must be unique
+Import trace for requested module:
+./src/components/RegisterForm.tsx
+./src/components/LoginForm.tsx
+./src/app/page.tsx
+> Build failed because of webpack errors
+==> Build failed 😞
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys

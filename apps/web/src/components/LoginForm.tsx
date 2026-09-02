@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import RegisterForm from './RegisterForm';
 
-export const LoginForm: React.FC = () => {
+export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -152,6 +152,4 @@ export const LoginForm: React.FC = () => {
       </div>
     </div>
   );
-};
-
-export default LoginForm;
+}
