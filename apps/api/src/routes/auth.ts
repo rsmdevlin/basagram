@@ -15,6 +15,7 @@ interface UserRow {
   username: string;
   display_name: string;
   email: string;
+  password_hash?: string;
   avatar_url?: string;
   bio?: string;
   is_online: boolean;
