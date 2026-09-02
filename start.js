@@ -41,14 +41,14 @@ setTimeout(() => {
 
   // Запускаем прокси на основном PORT
   setTimeout(() => {
-    const PORT = process.env.PORT || 3000;
+    const MAIN_PORT = process.env.PORT || 3000;
 
-    console.log(`\n🔄 Запускаем прокси на порту ${PORT}...\n`);
+    console.log(`\n🔄 Запускаем прокси на порту ${MAIN_PORT}...\n`);
 
     const server = http.createServer((req, res) => {
       const isApiRequest = req.url.startsWith('/api/') || req.url.startsWith('/health');
       const targetPort = isApiRequest ? 3001 : 3000;
-      const targetHost = 'localhost';
+      const targetHost = '127.0.0.1';
 
       const proxyReq = http.request(
         {
@@ -73,8 +73,8 @@ setTimeout(() => {
       req.pipe(proxyReq);
     });
 
-    server.listen(PORT, () => {
-      console.log(`✅ Прокси запущен на порту ${PORT}`);
+    server.listen(MAIN_PORT, () => {
+      console.log(`✅ Прокси запущен на порту ${MAIN_PORT}`);
       console.log(`🎉 Basagram готов! Откройте https://basagrams.onrender.com\n`);
     });
 

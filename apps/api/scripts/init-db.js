@@ -66,8 +66,8 @@ async function initializeDatabase() {
         try {
           await connection.execute(statement);
         } catch (err) {
-          // Ignore "table already exists" errors
-          if (!err.message.includes('already exists')) {
+          // Ignore "table already exists" and "duplicate constraint" errors
+          if (!err.message.includes('already exists') && !err.message.includes('Duplicate') && !err.message.includes('duplicate')) {
             throw err;
           }
         }
