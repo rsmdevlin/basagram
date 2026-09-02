@@ -10,7 +10,10 @@ export { MobileConversationMenu } from './MobileConversationMenu';
 export { LoginForm } from './LoginForm';
 export { RegisterForm } from './RegisterForm';
 export { SearchInput } from './SearchInput';
+export { CreateGroupForm } from './CreateGroupForm';
+export { SettingsPanel } from './SettingsPanel';
 export { TelegramLayout } from './TelegramLayout';
+
 
 
 
