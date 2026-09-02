@@ -1,17 +1,9 @@
-export { CallHistory, IncomingCallDialog, ActiveCall } from './CallComponents';
-export { ChannelCard, ChannelHeader, CreateChannelDialog } from './ChannelComponents';
-export { ConversationHeader } from './ConversationHeader';
-export { CreateGroupDialog, GroupMembersList, GroupSettings } from './GroupComponents';
-export { Message, MessageList } from './Message';
-export { MessageComposer } from './MessageComposer';
-export { MessageActions, MessageEditForm, ReactionDisplay } from './MessageFeatures';
-export { NotificationItem, NotificationCenter } from './NotificationComponents';
-export { RootLayout } from './RootLayout';
-export { AuditLogItem, PasswordChangeForm, SecurityStatus, SessionItem, TwoFactorSetup } from './SecurityComponents';
-export { SettingsSection, Toggle, Select, DangerZone, BlockList, BlockedUserItem } from './SettingsComponents';
-export { CreateStoryDialog, StoryCard, StoryViewer } from './StoryComponents';
-export { UserProfileView } from './UserProfileView';
-export { MediaUploader, MediaViewer } from './MediaComponents';
-export { ReplyThread } from './ReplyThread';
-export { ForwardDialog } from './ForwardDialog';
+// Export all components for easy importing
+export { Avatar } from './Avatar';
+export { Badge } from './Badge';
+export { MessageBubble } from './MessageBubble';
 export { ConversationList } from './ConversationList';
+export { ChatHeader } from './ChatHeader';
+export { MessageComposer } from './MessageComposer';
+export { TypingIndicator } from './TypingIndicator';
+export { TelegramLayout } from './TelegramLayout';

@@ -1,11 +1,464 @@
+/* ============================================
+   BASAGRAM — Telegram-class UI/UX Design System
+   Based on Telegram Desktop source analysis
+   ============================================ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Smooth scrolling */
+/* ========== COLOR PALETTE ==========
+   Derived from Telegram theme files
+   ======================================== */
+
+:root {
+  /* Primary Colors — Telegram Blue #0088cc */
+  --tg-primary: #0088cc;
+  --tg-primary-hover: #0077b5;
+  --tg-primary-active: #005fa3;
+  --tg-primary-light: #33a1ff;
+  --tg-primary-dark: #004a8d;
+
+  /* Accent Colors */
+  --tg-success: #31a24c;
+  --tg-warning: #f59e0b;
+  --tg-danger: #ef4444;
+  --tg-info: #3b82f6;
+
+  /* Light Theme — Desktop Default */
+  --tg-bg: #ffffff;
+  --tg-surface: #f2f2f2;
+  --tg-surface-secondary: #efefef;
+  --tg-border: #e5e5ea;
+
+  --tg-text: #000000;
+  --tg-text-secondary: #666666;
+  --tg-text-tertiary: #999999;
+  --tg-text-muted: #c0c0c0;
+
+  /* Message Bubbles — Light */
+  --tg-msg-in-bg: #e5e5ea;
+  --tg-msg-in-fg: #000000;
+  --tg-msg-in-selected: #d5dce2;
+  --tg-msg-out-bg: #d5f4ff;
+  --tg-msg-out-fg: #000000;
+  --tg-msg-out-selected: #b3e5ff;
+
+  /* Service Messages */
+  --tg-service-bg: #f0f0f0;
+  --tg-service-fg: #777777;
+
+  /* Dark Theme */
+  --tg-dark-bg: #212121;
+  --tg-dark-surface: #2c2c2c;
+  --tg-dark-surface-secondary: #3a3a3a;
+  --tg-dark-border: #404040;
+
+  --tg-dark-text: #ffffff;
+  --tg-dark-text-secondary: #b3b3b3;
+  --tg-dark-text-tertiary: #808080;
+  --tg-dark-text-muted: #606060;
+
+  /* Message Bubbles — Dark */
+  --tg-dark-msg-in-bg: #1c1c1c;
+  --tg-dark-msg-in-fg: #ffffff;
+  --tg-dark-msg-in-selected: #2e3238;
+  --tg-dark-msg-out-bg: #166088;
+  --tg-dark-msg-out-fg: #ffffff;
+  --tg-dark-msg-out-selected: #2e70a5;
+
+  /* Shadows */
+  --tg-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --tg-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --tg-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --tg-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.2);
+  --tg-shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.25);
+
+  /* ========== TYPOGRAPHY SCALE ==========
+     From Telegram Desktop style definitions
+     ======================================== */
+
+  /* Font Family — System stack matching Telegram */
+  --tg-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+
+  /* Font Sizes */
+  --tg-font-size-xs: 11px;
+  --tg-font-size-sm: 12px;
+  --tg-font-size-base: 15px;
+  --tg-font-size-lg: 16px;
+  --tg-font-size-xl: 17px;
+  --tg-font-size-2xl: 20px;
+  --tg-font-size-3xl: 24px;
+
+  /* Font Weights */
+  --tg-font-weight-regular: 400;
+  --tg-font-weight-medium: 500;
+  --tg-font-weight-semibold: 600;
+  --tg-font-weight-bold: 700;
+
+  /* Line Heights */
+  --tg-line-height-tight: 1.2;
+  --tg-line-height-normal: 1.5;
+  --tg-line-height-relaxed: 1.75;
+
+  /* ========== SPACING SCALE ==========
+     Telegram Desktop margins/padding
+     ===================================== */
+
+  --tg-space-1: 4px;
+  --tg-space-2: 8px;
+  --tg-space-3: 12px;
+  --tg-space-4: 16px;
+  --tg-space-5: 20px;
+  --tg-space-6: 24px;
+  --tg-space-7: 32px;
+  --tg-space-8: 40px;
+
+  /* Message-specific spacing (from chat.style) */
+  --tg-msg-padding: 11px 8px;
+  --tg-msg-margin: 16px 6px;
+  --tg-msg-reply-padding: 6px 6px 11px 6px;
+
+  /* ========== BORDER RADIUS ==========
+     Matching Telegram rounded corners
+     ===================================== */
+
+  --tg-radius-xs: 2px;
+  --tg-radius-sm: 4px;
+  --tg-radius-md: 8px;
+  --tg-radius-lg: 12px;
+  --tg-radius-xl: 16px;
+  --tg-radius-2xl: 20px;
+  --tg-radius-full: 999px;
+
+  /* ========== Z-INDEX STACK ==========
+     Layering hierarchy
+     ==================================== */
+
+  --tg-z-base: 0;
+  --tg-z-dropdown: 100;
+  --tg-z-sticky: 200;
+  --tg-z-fixed: 300;
+  --tg-z-modal-backdrop: 400;
+  --tg-z-modal: 500;
+  --tg-z-popover: 600;
+  --tg-z-tooltip: 700;
+  --tg-z-notification: 800;
+
+  /* ========== BREAKPOINTS ==========
+     Responsive design breakpoints
+     ===================================== */
+
+  --tg-breakpoint-xs: 0px;
+  --tg-breakpoint-sm: 480px;
+  --tg-breakpoint-md: 768px;
+  --tg-breakpoint-lg: 1024px;
+  --tg-breakpoint-xl: 1280px;
+  --tg-breakpoint-2xl: 1536px;
+
+  /* ========== ANIMATION TIMING ==========
+     From Telegram UI reveal durations
+     ======================================== */
+
+  --tg-duration-fastest: 75ms;
+  --tg-duration-fast: 100ms;
+  --tg-duration-base: 150ms;
+  --tg-duration-slow: 200ms;
+  --tg-duration-slower: 300ms;
+  --tg-duration-slowest: 500ms;
+
+  --tg-ease-in-quad: cubic-bezier(0.55, 0.085, 0.68, 0.53);
+  --tg-ease-in-cubic: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+  --tg-ease-out-quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --tg-ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --tg-ease-in-out-quad: cubic-bezier(0.455, 0.03, 0.515, 0.955);
+}
+
+/* ========== DARK MODE ==========
+   Automatic dark theme support
+   ============================== */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tg-bg: var(--tg-dark-bg);
+    --tg-surface: var(--tg-dark-surface);
+    --tg-surface-secondary: var(--tg-dark-surface-secondary);
+    --tg-border: var(--tg-dark-border);
+
+    --tg-text: var(--tg-dark-text);
+    --tg-text-secondary: var(--tg-dark-text-secondary);
+    --tg-text-tertiary: var(--tg-dark-text-tertiary);
+    --tg-text-muted: var(--tg-dark-text-muted);
+
+    --tg-msg-in-bg: var(--tg-dark-msg-in-bg);
+    --tg-msg-in-fg: var(--tg-dark-msg-in-fg);
+    --tg-msg-in-selected: var(--tg-dark-msg-in-selected);
+    --tg-msg-out-bg: var(--tg-dark-msg-out-bg);
+    --tg-msg-out-fg: var(--tg-dark-msg-out-fg);
+    --tg-msg-out-selected: var(--tg-dark-msg-out-selected);
+
+    --tg-service-bg: #2c2c2c;
+    --tg-service-fg: #b3b3b3;
+  }
+}
+
+/* ========== GLOBAL STYLES ==========
+   Foundation styles for all elements
+   ==================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 html {
   scroll-behavior: smooth;
+  font-family: var(--tg-font-family);
+  background: var(--tg-bg);
+  color: var(--tg-text);
 }
+
+body {
+  background: var(--tg-bg);
+  color: var(--tg-text);
+  font-size: var(--tg-font-size-base);
+  line-height: var(--tg-line-height-normal);
+  font-weight: var(--tg-font-weight-regular);
+}
+
+/* ========== ANIMATION KEYFRAMES ==========
+   Telegram-style animations
+   ========================================= */
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Typing indicator dots animation */
+@keyframes typingDot {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-8px);
+  }
+}
+
+/* Message bubble entrance */
+@keyframes messageBubbleIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Reaction pop animation */
+@keyframes reactionPop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Online indicator pulse */
+@keyframes onlinePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(49, 162, 76, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(49, 162, 76, 0);
+  }
+}
+
+/* ========== UTILITY ANIMATIONS ==========
+   Animation helper classes
+   ========================================= */
+
+@layer utilities {
+  .animate-slide-up {
+    animation: slideInUp 0.3s var(--tg-ease-out-quad);
+  }
+
+  .animate-slide-down {
+    animation: slideInDown 0.3s var(--tg-ease-out-quad);
+  }
+
+  .animate-slide-left {
+    animation: slideInLeft 0.3s var(--tg-ease-out-quad);
+  }
+
+  .animate-slide-right {
+    animation: slideInRight 0.3s var(--tg-ease-out-quad);
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s var(--tg-ease-out-quad);
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease;
+  }
+
+  .animate-typing-dot {
+    animation: typingDot 1.4s infinite;
+  }
+
+  .animate-message-bubble {
+    animation: messageBubbleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .animate-reaction-pop {
+    animation: reactionPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .animate-online-pulse {
+    animation: onlinePulse 2s infinite;
+  }
+
+  /* Transition utilities */
+  .transition-smooth {
+    transition: all 0.3s ease;
+  }
+
+  .transition-fast {
+    transition: all 0.15s ease;
+  }
+
+  .transition-color {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+
+  /* Focus utilities */
+  .focus-ring {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--tg-bg), 0 0 0 4px var(--tg-primary);
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+  }
+
+  /* Loading skeleton */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.05) 0%,
+      rgba(0, 0, 0, 0.1) 50%,
+      rgba(0, 0, 0, 0.05) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+}
+
 
 /* Base animations */
 @layer base {
@@ -108,6 +561,73 @@ html {
       transform: translateY(-4px);
     }
   }
+
+  /* Telegram-specific animations */
+  @keyframes messageBubbleIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes messageReadAnimation {
+    0%, 100% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes typingDot {
+    0%, 60%, 100% {
+      opacity: 0.3;
+      transform: translateY(0);
+    }
+    30% {
+      opacity: 1;
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes presenceOnline {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(49, 162, 76, 0.7);
+    }
+    50% {
+      box-shadow: 0 0 0 6px rgba(49, 162, 76, 0);
+    }
+  }
+
+  @keyframes reactionPop {
+    0% {
+      transform: scale(0.5);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes gradientShift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
 }
 
 /* Utility animation classes */
@@ -159,6 +679,31 @@ html {
     animation: bounce-soft 1s ease-in-out infinite;
   }
 
+  /* Telegram animations */
+  .animate-message-bubble {
+    animation: messageBubbleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .animate-message-read {
+    animation: messageReadAnimation 1.5s ease-in-out infinite;
+  }
+
+  .animate-typing-dot {
+    animation: typingDot 1.4s infinite;
+  }
+
+  .animate-presence-online {
+    animation: presenceOnline 2s infinite;
+  }
+
+  .animate-reaction-pop {
+    animation: reactionPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .animate-gradient-shift {
+    animation: gradientShift 3s ease infinite;
+  }
+
   /* Transition utilities */
   .transition-smooth {
     transition: all 0.3s ease-in-out;
@@ -195,13 +740,13 @@ html {
   }
 
   .hover-glow:hover {
-    box-shadow: 0 0 16px rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 16px rgba(0, 136, 204, 0.5);
   }
 
   /* Focus states */
   .focus-ring {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 0 0 1px rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 0 3px rgba(0, 136, 204, 0.1), 0 0 0 1px rgba(0, 136, 204, 0.5);
   }
 
   /* Smooth transitions for common interactions */
@@ -237,12 +782,117 @@ html {
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.1);
     border-radius: 3px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  }
+
+  /* Telegram message bubble styles */
+  .message-bubble {
+    padding: var(--tg-spacing-md) var(--tg-spacing-lg);
+    border-radius: var(--tg-radius-lg);
+    max-width: 80%;
+    word-wrap: break-word;
+    box-shadow: var(--tg-shadow-sm);
+  }
+
+  .message-bubble-own {
+    background: var(--tg-bg-bubble-own);
+    color: var(--tg-text-primary);
+    border-bottom-right-radius: var(--tg-radius-sm);
+  }
+
+  .message-bubble-other {
+    background: var(--tg-bg-bubble-other);
+    color: var(--tg-text-primary);
+    border-bottom-left-radius: var(--tg-radius-sm);
+  }
+
+  /* Telegram input field */
+  .tg-input {
+    background: var(--tg-bg-secondary);
+    border: 1px solid var(--tg-bg-tertiary);
+    border-radius: var(--tg-radius-lg);
+    padding: var(--tg-spacing-md);
+    font-size: var(--tg-font-size-base);
+    color: var(--tg-text-primary);
+    transition: all 0.2s ease;
+  }
+
+  .tg-input:focus {
+    outline: none;
+    border-color: var(--tg-primary);
+    box-shadow: 0 0 0 3px rgba(0, 136, 204, 0.1);
+  }
+
+  /* Telegram button */
+  .tg-button {
+    background: var(--tg-primary);
+    color: var(--tg-text-on-primary);
+    border: none;
+    border-radius: var(--tg-radius-lg);
+    padding: var(--tg-spacing-sm) var(--tg-spacing-lg);
+    font-size: var(--tg-font-size-base);
+    font-weight: var(--tg-font-weight-medium);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .tg-button:hover {
+    background: var(--tg-primary-dark);
+    transform: translateY(-1px);
+    box-shadow: var(--tg-shadow-md);
+  }
+
+  .tg-button:active {
+    transform: translateY(0);
+  }
+
+  /* Telegram avatar */
+  .tg-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--tg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tg-text-on-primary);
+    font-weight: var(--tg-font-weight-semibold);
+    font-size: var(--tg-font-size-lg);
+  }
+
+  .tg-avatar-lg {
+    width: 64px;
+    height: 64px;
+    font-size: var(--tg-font-size-xl);
+  }
+
+  /* Online indicator */
+  .online-indicator {
+    width: 12px;
+    height: 12px;
+    background: var(--tg-accent);
+    border-radius: 50%;
+    border: 2px solid var(--tg-bg-primary);
+    box-shadow: var(--tg-shadow-sm);
+  }
+
+  .online-indicator.pulse {
+    animation: presenceOnline 2s infinite;
   }
 }
 

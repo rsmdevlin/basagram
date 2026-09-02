@@ -1,2236 +1,597 @@
-npm error code EUNSUPPORTEDPROTOCOL
-npm error Unsupported URL Type "workspace:": workspace:*
-npm error A complete log of this run can be found in: /opt/render/.cache/_logs/2026-09-01T21_52_17_146Z-debug-0.log
-==> Build failed 😞
-==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+Ты работаешь над моим проектом web-messenger и должен использовать локально клонированный исходный код Telegram Desktop как подробный UI/UX reference.
+
+Главная цель: полностью изучить локальный репозиторий Telegram Desktop — структуру UI, компоненты, стили, темы, цвета, размеры, состояния, иконки, анимации, переходы, TGS/Lottie-анимации и UX-поведение — а затем профессионально реализовать аналогичный по уровню качества Telegram-like интерфейс в моем WEB-мессенджере.
+
+ВАЖНО: не копируй Telegram слепо 1:1 и не превращай проект в прямой клон. Изучи реальные исходники Telegram Desktop, пойми принципы его интерфейса и поведения и перенеси их в мой проект современным веб-способом, сохранив собственный стиль проекта.
+
+1. СНАЧАЛА ОПРЕДЕЛИ ПРАВИЛЬНЫЕ ПУТИ
+
+Не делай никаких предположений о расположении файлов.
+
+Перед чтением файлов обязательно:
+
+Выведи текущую рабочую директорию.
+Найди реальную директорию моего web-messenger.
+Найди реальную директорию локального tdesktop.
+Сохрани абсолютные пути и используй только их.
+
+На Windows используй PowerShell-команды вроде:
+
+Get-Location
+Get-ChildItem "C:\Users\myteg\Desktop" -Directory
+Get-ChildItem "C:\Users\myteg\Desktop" -Directory -Recurse -Depth 2 |
+  Where-Object { $_.Name -eq "tdesktop" -or $_.Name -eq "web-messenger" } |
+  Select-Object FullName
+
+После обнаружения путей назначь их логически:
+
+TDESKTOP_ROOT=<реальный абсолютный путь к tdesktop>
+WEB_MESSENGER_ROOT=<реальный абсолютный путь к web-messenger>
+
+НИКОГДА больше не пытайся читать путь, которого не существует.
+
+Если Read сообщает File does not exist, не продолжай угадывать путь. Сначала найди файл через Get-ChildItem, Select-String, rg, fd или аналогичный поиск.
+
+2. НЕ ОГРАНИЧИВАЙСЯ ПАРОЙ ФАЙЛОВ
+
+Я хочу, чтобы ты реально исследовал Telegram Desktop систематически.
+
+Изучи как минимум:
+
+Telegram/SourceFiles/ui
+Telegram/SourceFiles/window
+Telegram/SourceFiles/history
+Telegram/SourceFiles/dialogs
+Telegram/SourceFiles/chat_helpers
+Telegram/SourceFiles/settings
+Telegram/SourceFiles/info
+Telegram/SourceFiles/profile
+Telegram/SourceFiles/boxes
+Telegram/SourceFiles/media
+Telegram/SourceFiles/data
+Telegram/Resources
+
+Также ищи по всему репозиторию:
+
+*.style
+*.h
+*.cpp
+*.json
+*.tgs
+*.svg
+*.webp
+*.png
+*.gif
+*.qrc
+
+Используй поиск по содержимому:
+
+rg -n "animation|animate|transition|opacity|scale|slide|fade|easing|duration" <TDESKTOP_ROOT>
+rg -n "message|bubble|history|chat|dialog|typing|online|unread|reaction" <TDESKTOP_ROOT>
+rg -n "palette|color|background|radius|font|padding|margin" <TDESKTOP_ROOT>
+
+Не читай случайные 150 строк одного файла и не заявляй после этого, что Telegram изучен.
+
+3. ПОСТРОЙ КАРТУ UI TELEGRAM DESKTOP
+
+Перед серьезными изменениями web-messenger составь для себя техническую карту Telegram Desktop:
+
+UI Area
+├─ Authorization
+├─ Main window
+├─ Left sidebar
+│  ├─ Search
+│  ├─ Dialog row
+│  ├─ Avatar
+│  ├─ Online status
+│  ├─ Unread badge
+│  └─ Context actions
+├─ Chat header
+├─ Message history
+│  ├─ incoming message
+│  ├─ outgoing message
+│  ├─ grouped messages
+│  ├─ reply
+│  ├─ reactions
+│  ├─ status/checkmarks
+│  ├─ media
+│  ├─ voice
+│  └─ service messages
+├─ Composer
+├─ Emoji/sticker/GIF panel
+├─ Search
+├─ Profile
+├─ Settings
+├─ Context menus
+├─ Modals
+├─ Tooltips
+├─ Mobile/responsive states
+└─ Animations/transitions
 
+Для каждого блока выясни:
 
-БД: mysql://gs348298:eKDxA99Mc2sf@80.242.59.112:3306/gs348298
+где находится реализация;
+какие стили используются;
+размеры;
+отступы;
+border-radius;
+цвета;
+hover;
+active;
+pressed;
+selected;
+disabled;
+focus;
+animation;
+duration;
+easing;
+enter/exit transition;
+keyboard/mouse behavior.
+4. ОБЯЗАТЕЛЬНО ИЗУЧАЙ .style
 
-# BASAGRAM — MASTER ENGINEERING & PRODUCT SPECIFICATION
+Telegram Desktop использует собственную систему .style.
 
-## 0. КРИТИЧЕСКАЯ ИНСТРУКЦИЯ
+Не относись к ней как к обычному CSS.
 
-Ты — автономный senior/staff-level software engineer, software architect, product engineer, UI/UX engineer и performance engineer.
+Найди определения:
 
-Твоя задача — **С НУЛЯ СОЗДАТЬ BASAGRAM**, полноценный современный messenger уровня production, начиная с полностью пустого GitHub-репозитория.
+palette;
+typography;
+dimensions;
+margins;
+padding;
+radii;
+icon sizes;
+row heights;
+message spacing;
+sidebar widths;
+header heights.
 
-Это НЕ задача «сделать красивый макет».
+Прослеживай связи между style-файлами и C++ компонентами.
+
+Если видишь что-то вроде:
+
+st::someStyle
+
+найди определение someStyle, а не угадывай его значение.
+
+5. TGS / LOTTIE — ОБЯЗАТЕЛЬНО
+
+Я хочу, чтобы ты умел исследовать .tgs.
+
+.tgs — это Telegram Animated Sticker / Lottie JSON, обычно сжатый gzip.
+
+Когда находишь .tgs, не говори, что формат неизвестен.
+
+На Windows можешь:
+
+Get-ChildItem <TDESKTOP_ROOT> -Recurse -Filter *.tgs
 
-Это НЕ задача «создать несколько экранов».
+Для анализа содержимого распаковывай его во временную директорию, не изменяя оригинал.
+
+Можно использовать Python:
+
+import gzip
+import json
 
-Это НЕ задача «сделать demo».
+src = r"C:\path\animation.tgs"
 
-Нужно постепенно создать **реально работающий продукт** с frontend, backend, database, realtime, authentication, media, permissions, responsive UI, mobile UX, desktop UX, animations, security, caching, tests и нормальной архитектурой.
+with gzip.open(src, "rt", encoding="utf-8") as f:
+    data = json.load(f)
 
----
-
-# 1. ГЛАВНОЕ ПРАВИЛО — НЕ БИЛДИТЬ
-
-## НЕ ЗАПУСКАЙ PRODUCTION BUILD
-
-На всём протяжении этой задачи:
-
-* НЕ запускай `npm run build`
-* НЕ запускай `next build`
-* НЕ создавай production build
-* НЕ запускай EAS Build
-* НЕ создавай IPA/APK
-* НЕ собирай Docker production image
-* НЕ выполняй другие production-build операции
-
-Можно и нужно:
-
-* устанавливать зависимости;
-* запускать development server;
-* запускать TypeScript checks;
-* запускать ESLint;
-* запускать unit/integration tests;
-* запускать локальные dev services;
-* проверять API;
-* проверять database;
-* проверять realtime;
-* проверять frontend;
-* проверять browser console;
-* использовать development tooling.
-
-**Сейчас главная цель — разработка и качество исходного проекта, а не production build.**
-
----
-
-# 2. РЕПОЗИТОРИЙ
-
-Репозиторий полностью пустой.
-
-Не пытайся сохранить старую архитектуру.
-
-Не ищи старый проект как источник дизайна.
-
-Не переноси старые компоненты.
-
-Не копируй старый UI.
-
-Не делай миграцию старого проекта.
-
-**Basagram создаётся с нуля.**
-
-Работай непосредственно с текущим Git repository.
-
-После каждого логического крупного этапа:
-
-1. проверь изменения;
-2. проверь TypeScript;
-3. проверь lint;
-4. запусти необходимые tests;
-5. исправь найденные проблемы;
-6. сделай понятный Git commit;
-7. push в GitHub.
-
-Примеры commit:
-
-```text
-feat(core): initialize basagram architecture
-feat(auth): implement authentication system
-feat(chat): implement realtime private chats
-feat(messages): implement message system
-feat(media): implement media uploads
-feat(groups): implement group conversations
-feat(channels): implement channels
-feat(stories): implement stories
-feat(calls): implement realtime calls
-feat(settings): implement settings system
-perf(messages): optimize message rendering
-fix(realtime): fix reconnect handling
-```
-
-Никогда не коммить секреты.
-
----
-
-# 3. ENVIRONMENT / SECRETS
-
-Все секреты должны приходить через environment variables.
-
-Используй:
-
-```env
-DATABASE_URL=
-REDIS_URL=
-SESSION_SECRET=
-JWT_SECRET=
-STORAGE_ENDPOINT=
-STORAGE_ACCESS_KEY=
-STORAGE_SECRET_KEY=
-STORAGE_BUCKET=
-TURN_SERVER=
-TURN_USERNAME=
-TURN_PASSWORD=
-```
-
-Создай:
-
-```text
-.env.example
-```
-
-Но **никогда не помещай реальные credentials в Git**.
-
-Database должна подключаться через:
-
-```text
-process.env.DATABASE_URL
-```
-
-Не хардкодь credentials.
-
----
-
-# 4. DATABASE
-
-Основная persistent database:
-
-**MySQL**
-
-Используй существующую MySQL database через:
-
-```text
-DATABASE_URL
-```
-
-Перед созданием схемы:
-
-1. подключись к database;
-2. изучи существующую структуру;
-3. определи, какие таблицы уже существуют;
-4. не уничтожай существующие данные;
-5. используй существующие таблицы там, где это логично;
-6. создай недостающие таблицы/migrations;
-7. индексы проектируй с учётом реальных messenger queries.
-
-Database должна быть нормальной production-oriented системой.
-
-Предусмотри сущности:
-
-* users
-* sessions
-* devices
-* profiles
-* conversations
-* conversation_members
-* messages
-* message_reactions
-* message_reads
-* message_attachments
-* media
-* stickers
-* sticker_sets
-* gifs
-* saved_messages
-* pinned_messages
-* chat_settings
-* contacts
-* blocks
-* reports
-* groups
-* group_roles
-* group_permissions
-* channels
-* channel_members
-* channel_posts
-* stories
-* story_views
-* notifications
-* folders
-* folder_chats
-* calls
-* call_participants
-* invites
-* usernames
-* privacy_settings
-* notification_settings
-* appearance_settings
-* sessions/devices
-* admin/audit records
-
-Но не создавай бессмысленные таблицы только ради количества.
-
-Проектируй schema исходя из реально реализуемых функций.
-
-Используй:
-
-* foreign keys там, где это необходимо;
-* indexes;
-* unique constraints;
-* transactions;
-* pagination;
-* cursor-based queries;
-* soft delete там, где это необходимо;
-* timestamps;
-* proper relations.
-
----
-
-# 5. STACK
-
-## Основной frontend
-
-Используй:
-
-* React
-* TypeScript
-* Next.js
-* modern React patterns
-
-React + TypeScript должны оставаться основой приложения.
-
----
-
-# 6. POLYGLOT ARCHITECTURE
-
-Мне нужен не набор языков ради количества.
-
-Каждая технология должна иметь **конкретную техническую роль**.
-
-## TypeScript
-
-Главный язык:
-
-* frontend;
-* backend;
-* API;
-* realtime;
-* business logic;
-* validation;
-* shared types.
-
-## CSS / SCSS
-
-Используй для:
-
-* design system;
-* responsive layouts;
-* complex visual styling;
-* themes;
-* gradients;
-* shadows;
-* glass surfaces;
-* responsive behavior;
-* advanced UI states.
-
-Не превращай весь проект в хаотичный набор inline styles.
-
-## Motion
-
-Используй современную animation library, например Motion/Framer Motion, для:
-
-* page transitions;
-* modal transitions;
-* drawers;
-* bottom sheets;
-* message appearance;
-* reaction animations;
-* context menus;
-* gesture interactions;
-* spring physics;
-* swipe interactions;
-* microinteractions.
-
-Анимации должны быть осмысленными.
-
-## SVG
-
-Создай собственную систему SVG icons.
-
-Не копируй Telegram assets.
-
-Создай оригинальную Basagram iconography:
-
-* send;
-* attach;
-* search;
-* settings;
-* profile;
-* calls;
-* camera;
-* microphone;
-* reactions;
-* folders;
-* chats;
-* channels;
-* stories;
-* notifications;
-* security;
-* media;
-* navigation.
-
-Иконки должны выглядеть как единая система.
-
-## Canvas
-
-Используй Canvas там, где это реально полезно:
-
-* audio waveform;
-* voice recording visualization;
-* audio visualizer;
-* advanced media visualization;
-* lightweight realtime graphics.
-
-## WebGL / GLSL
-
-Используй WebGL/GLSL для отдельных premium visual layers:
-
-* Aurora background;
-* subtle liquid light;
-* GPU gradient effects;
-* interactive light;
-* distortion;
-* advanced ambient backgrounds.
-
-**НЕ используй WebGL для обычных кнопок, списков и стандартного UI.**
-
-## Three.js
-
-Используй только если действительно требуется сложная 3D/WebGL-сцена.
-
-Не добавляй Three.js просто ради галочки.
-
-## Rust + WebAssembly
-
-Используй Rust/WASM только для CPU-heavy задач, если они реально возникают:
-
-* heavy media processing;
-* computationally expensive transformations;
-* specialized parsing;
-* heavy client-side algorithms.
-
-Не переписывай обычный TypeScript код на Rust без причины.
-
-## Web Workers
-
-Используй Workers для тяжёлых браузерных операций, чтобы не блокировать main thread.
-
-## SQL
-
-Используй SQL/MySQL как persistent source of truth.
-
-## Redis
-
-Используй Redis для:
-
-* presence;
-* typing state;
-* ephemeral state;
-* pub/sub;
-* realtime coordination;
-* cache;
-* rate limiting;
-* temporary data.
-
-Не храни persistent messages только в Redis.
-
-## WebSocket
-
-Используй WebSocket/Socket.IO для realtime.
-
-## WebRTC
-
-Используй WebRTC для:
-
-* voice calls;
-* video calls;
-* screen sharing;
-* peer connection.
-
-Предусмотри STUN/TURN architecture.
-
-## Object Storage
-
-Для media используй S3-compatible storage / Cloudflare R2 или аналогичную архитектуру.
-
-Не храни большие файлы непосредственно в MySQL.
-
-## IndexedDB
-
-Используй IndexedDB для:
-
-* local message cache;
-* media cache;
-* drafts;
-* offline state;
-* optimistic state;
-* recent conversations.
-
-## Service Worker / PWA
-
-Создай полноценную PWA architecture:
-
-* manifest;
-* service worker;
-* offline shell;
-* reconnect;
-* update handling;
-* installability;
-* standalone mode.
-
----
-
-# 7. TELEGRAM-LEVEL PRODUCT RESEARCH
-
-Перед реализацией каждой крупной функции:
-
-**ИССЛЕДУЙ, КАК ЭТА ФУНКЦИЯ РАБОТАЕТ В TELEGRAM И ДРУГИХ СОВРЕМЕННЫХ МЕССЕНДЖЕРАХ.**
-
-Исследуй:
-
-* UX;
-* user flows;
-* states;
-* permissions;
-* edge cases;
-* mobile behavior;
-* desktop behavior;
-* animations;
-* loading states;
-* error states;
-* interaction patterns;
-* privacy behavior;
-* realtime behavior.
-
-Используй актуальные публичные источники и официальную документацию там, где она существует.
-
-Telegram используй как **reference для уровня функциональности и UX**, а не как источник кода.
-
-**НЕ КОПИРУЙ:**
-
-* исходный код Telegram;
-* закрытые реализации;
-* proprietary assets;
-* Telegram icons;
-* Telegram illustrations;
-* Telegram branding;
-* Telegram visual identity.
-
-Создавай **свою Basagram реализацию**.
-
----
-
-# 8. BASAGRAM DESIGN LANGUAGE
-
-Придумай и реализуй собственный визуальный язык:
-
-# BASAGRAM AURORA
-
-Основная идея:
-
-**premium messenger + iOS-inspired interaction + modern web technology**
-
-Визуальная атмосфера:
-
-* глубокие спокойные backgrounds;
-* premium typography;
-* мягкая глубина;
-* subtle glass;
-* translucent surfaces;
-* аккуратный blur;
-* тонкие borders;
-* controlled gradients;
-* dynamic ambient light;
-* smooth shadows;
-* sophisticated spacing;
-* tactile interactions.
-
-Но:
-
-**НЕ ПЕРЕУСЕРДСТВУЙ С GLASSMORPHISM.**
-
-Не превращай интерфейс в:
-
-* neon dashboard;
-* crypto website;
-* gaming UI;
-* generic SaaS dashboard.
-
-Интерфейс должен быть:
-
-**спокойным, дорогим, современным и очень удобным.**
-
----
-
-# 9. MOBILE UX
-
-Mobile design — не уменьшенная desktop версия.
-
-Создай отдельный mobile interaction model.
-
-Учитывай:
-
-* safe areas;
-* bottom navigation;
-* bottom sheets;
-* swipe gestures;
-* long press;
-* swipe back;
-* keyboard behavior;
-* dynamic viewport;
-* touch targets;
-* iOS-like spring animations;
-* modal presentation;
-* context menus;
-* haptic-ready interaction architecture.
-
-Особенно качественно проработай:
-
-* chat list;
-* conversation;
-* composer;
-* media viewer;
-* profile;
-* settings;
-* sheets;
-* dialogs.
-
-Breakpoints минимум:
-
-```text
-320
-375
-390
-430
-768
-1024
-1280
-1440
-1920
-```
-
-Никакого horizontal overflow.
-
----
-
-# 10. DESKTOP UX
-
-Desktop должен ощущаться полноценным приложением.
-
-Используй adaptive layout:
-
-```text
-sidebar
-chat list
-conversation
-optional details panel
-```
-
-В зависимости от viewport:
-
-* single-column mobile;
-* two-column tablet;
-* three-column desktop.
-
-Поддержи:
-
-* mouse;
-* keyboard;
-* touch;
-* right-click;
-* keyboard shortcuts;
-* drag & drop;
-* hover states.
-
----
-
-# 11. AUTHENTICATION
-
-Реализуй полноценную authentication system.
-
-Нужно:
-
-* register;
-* login;
-* logout;
-* persistent session;
-* refresh/rotation;
-* session expiration;
-* device/session management;
-* password hashing;
-* forgot password;
-* reset password;
-* email verification architecture;
-* rate limiting;
-* brute-force protection;
-* secure cookies/session handling.
-
-Используй современный password hashing algorithm, например Argon2id.
-
-Никогда не храни plaintext passwords.
-
----
-
-# 12. USER PROFILE
-
-Профиль:
-
-* avatar;
-* display name;
-* username;
-* bio;
-* online status;
-* last seen;
-* profile photos;
-* shared media;
-* shared files;
-* shared links;
-* mutual groups;
-* privacy settings;
-* notification settings;
-* block;
-* report.
-
----
-
-# 13. PRIVATE CHATS
-
-Полностью реализуй:
-
-* create chat;
-* open chat;
-* realtime messages;
-* message history;
-* pagination;
-* unread counter;
-* read state;
-* sent state;
-* delivered state;
-* typing;
-* recording state;
-* online presence;
-* last seen;
-* mute;
-* archive;
-* pin;
-* delete conversation;
-* search conversation.
-
----
-
-# 14. MESSAGE SYSTEM
-
-Message model должен поддерживать:
-
-* text;
-* emoji;
-* formatted text;
-* links;
-* images;
-* videos;
-* files;
-* audio;
-* voice messages;
-* GIF;
-* stickers;
-* reactions;
-* replies;
-* forwards;
-* edits;
-* deletes;
-* pins;
-* mentions;
-* link previews.
-
-Message lifecycle:
-
-```text
-draft
-→ sending
-→ sent
-→ delivered
-→ read
-```
-
-При ошибке:
-
-```text
-failed
-→ retry
-```
-
----
-
-# 15. OPTIMISTIC UI
-
-Сообщения должны появляться мгновенно через optimistic UI.
-
-Используй:
-
-```text
-clientMessageId
-serverMessageId
-```
-
-Сценарий:
-
-```text
-user sends message
-↓
-temporary message appears immediately
-↓
-server receives message
-↓
-server confirms
-↓
-temporary ID reconciled
-↓
-realtime event propagated
-```
-
-Если отправка провалилась:
-
-* показать failed state;
-* дать retry;
-* не потерять текст.
-
----
-
-# 16. MESSAGE ACTIONS
+print(json.dumps(data, ensure_ascii=False, indent=2)[:20000])
+
+Из TGS анализируй:
+
+fr — framerate;
+ip / op — animation range;
+w / h;
+layers;
+transforms;
+opacity;
+scale;
+position;
+path animations;
+easing/keyframes;
+duration;
+loop behavior.
+
+Если анимация подходит для web, реализуй ее через:
+
+lottie-web, если это настоящая Lottie-анимация;
+CSS;
+SVG;
+Web Animations API;
+Framer Motion;
+React animation tools,
+
+выбирая наиболее подходящий вариант.
+
+Не конвертируй все TGS механически. Сначала выясни, для чего конкретная анимация используется в Telegram.
+
+6. SVG И ИКОНКИ
+
+Исследуй SVG и другие graphical assets.
+
+Для SVG анализируй:
+
+viewBox;
+paths;
+strokes;
+fills;
+opacity;
+transforms;
+masks;
+clip-path;
+stroke-linecap;
+stroke-linejoin.
+
+Если SVG является частью анимации, найди C++ код, который меняет его состояние.
+
+Для web создавай переиспользуемые React-компоненты и не вставляй сотни копий одного SVG.
+
+7. АНАЛИЗИРУЙ ИМЕННО ПОВЕДЕНИЕ, А НЕ ТОЛЬКО ВНЕШНИЙ ВИД
+
+Особенно изучи:
+
+появление нового сообщения;
+отправку сообщения;
+изменение статуса sent/read;
+typing indicator;
+unread counters;
+hover по сообщению;
+selection;
+right-click;
+context menu;
+replies;
+reactions;
+scroll-to-bottom;
+floating buttons;
+появление/скрытие sidebar;
+открытие профиля;
+opening/closing modal;
+переход chat list → conversation;
+search animations;
+skeleton/loading;
+empty states;
+online status;
+notification states.
+
+Особенно внимательно изучи animation timing.
+
+Мне не нужны грубые:
+
+transition: all .3s;
+
+Выбирай конкретные свойства:
+
+transition:
+  transform 160ms cubic-bezier(...),
+  opacity 140ms ease,
+  background-color 120ms ease;
+8. ИЗУЧИ TELEGRAM DESKTOP КАК СИСТЕМУ
+
+Ищи не только один конкретный экран.
+
+Мне нужны общие закономерности Telegram:
+
+visual hierarchy;
+density;
+spacing system;
+typography scale;
+surface hierarchy;
+shadows;
+separators;
+colors;
+accent behavior;
+selection;
+message grouping;
+unread state;
+muted chats;
+pinned chats;
+verified/status icons;
+avatars;
+profile panels;
+settings rows;
+contextual actions.
+
+На основе этого создай собственную цельную Design System для web-messenger.
+
+9. DESKTOP И MOBILE ДОЛЖНЫ БЫТЬ РАЗНЫМИ UX-СОСТОЯНИЯМИ
+
+Не просто уменьши desktop CSS.
 
 Desktop:
 
-**right click**
+sidebar + active conversation + optional info/profile panel
 
 Mobile:
 
-**long press**
+chat list
+    ↓
+opening animation
+    ↓
+full-screen conversation
+    ↓
+back gesture/button
 
-Доступные действия должны зависеть от контекста.
+Реализуй адаптацию нормально.
+
+Tablet — промежуточное состояние.
+
+10. НЕ ЛОМАЙ WEB-ПОВЕДЕНИЕ
+
+Это WEB приложение.
+
+Не отключай глобально:
+
+preventDefault()
+
+для:
+
+LMB;
+выделения текста;
+input;
+ссылок;
+scroll;
+браузерных функций.
+
+Если нужен кастомный context-menu, ограничивай обработчик конкретной областью.
+
+Desktop должен оставаться нормальным веб-приложением.
+
+11. НЕ ПОДМЕНЯЙ BACKEND
+
+Мой backend, база данных, realtime и API уже существуют.
+
+Не создавай demo-data вместо настоящих данных.
+
+Перед изменениями выясни существующую архитектуру:
+
+auth;
+API client;
+Socket.IO/WebSocket;
+state management;
+current user;
+chats;
+messages;
+sender IDs;
+backend DTO/types.
+
+Сохраняй текущую функциональность.
+
+В частности убедись:
+
+message.sender_id === currentUser.id
+
+означает outgoing message.
+
+Не определяй направление сообщения по позиции, индексу или имени пользователя.
+
+12. НЕ ЛОМАЙСЯ ИЗ-ЗА БОЛЬШОГО РЕПОЗИТОРИЯ
+
+Не пытайся загрузить весь tdesktop в один context.
+
+Работай итеративно:
+
+DISCOVER
+    ↓
+INDEX
+    ↓
+FIND
+    ↓
+READ relevant files
+    ↓
+TRACE dependencies
+    ↓
+DOCUMENT findings internally
+    ↓
+IMPLEMENT
+    ↓
+VERIFY
+
+Используй rg/Get-ChildItem сначала, Read — потом.
+
+НИКОГДА:
+
+guessed path → Read
+guessed path → Read
+guessed path → Read
+13. ЕСЛИ ФАЙЛ БОЛЬШОЙ
+
+Не читай постоянно только lines 1-150.
+
+Сначала найди нужные символы:
+
+rg -n "SomeClass|SomeStyle|animation" file.cpp
+
+Потом читай диапазон вокруг совпадения.
+
+Если компонент разбит между .h, .cpp, .style, ресурсами — исследуй все связанные части.
+
+14. НЕ ОБЪЯВЛЯЙ PHASE COMPLETE БЕЗ РЕАЛЬНОЙ РАБОТЫ
+
+Запрещено писать:
+
+PHASE COMPLETE
+FULL RELEASE
+PRODUCTION READY
+Telegram UI completed
+
+если ты только:
+
+посмотрел несколько директорий;
+создал один CSS;
+сделал пару компонентов;
+не проверил остальные экраны.
+
+Статус задачи должен соответствовать фактически сделанной работе.
+
+15. ПОРЯДОК РАБОТЫ
+
+Работай в таком порядке:
+
+PHASE 0 — Environment/path discovery
+
+PHASE 1 — Telegram Desktop repository indexing
+
+PHASE 2 — Telegram design-system research
+
+PHASE 3 — Telegram animation/TGS/SVG research
+
+PHASE 4 — Existing web-messenger architecture analysis
+
+PHASE 5 — Global design-system implementation
+
+PHASE 6 — Auth screens
+
+PHASE 7 — Main application shell
+
+PHASE 8 — Chats sidebar
+
+PHASE 9 — Chat header
+
+PHASE 10 — Message system
+
+PHASE 11 — Composer
+
+PHASE 12 — Search
+
+PHASE 13 — Profiles
+
+PHASE 14 — Settings
+
+PHASE 15 — Context menus/modals
+
+PHASE 16 — Animations/microinteractions
+
+PHASE 17 — Responsive/mobile UX
+
+PHASE 18 — Real backend/realtime integration verification
+
+PHASE 19 — Final consistency/bug pass
+
+Не останавливайся после Foundation.
+
+Продолжай самостоятельно по следующим фазам.
+
+16. КАЧЕСТВО КОДА
+
+Не делай весь проект одним огромным компонентом.
+
+Создавай переиспользуемые компоненты вроде:
+
+Avatar
+IconButton
+SearchField
+ChatListItem
+UnreadBadge
+OnlineBadge
+ChatHeader
+MessageBubble
+MessageGroup
+MessageStatus
+TypingIndicator
+Composer
+ContextMenu
+Modal
+SettingsRow
+ProfilePanel
+AnimatedIcon
+
+Повторяемые значения вынеси в design tokens:
+
+colors
+spacing
+typography
+radii
+shadows
+durations
+easing
+z-index
+breakpoints
+17. СОЗДАЙ TELEGRAM RESEARCH NOTES В ПРОЕКТЕ
+
+Создай служебный файл, например:
+
+docs/telegram-ui-research.md
+
+Записывай туда найденные закономерности:
+
+Telegram source file
+Что реализует
+Какие параметры важны
+Как это переносится в web-messenger
+
+Но не трать всё время только на документацию — основная задача состоит в реализации.
+
+18. КАЖДЫЙ РАЗ, КОГДА ХОЧЕШЬ ЧТО-ТО СКОПИРОВАТЬ, СНАЧАЛА ПРОСЛЕДИ ИСТОЧНИК
 
 Например:
 
-* reply;
-* react;
-* copy;
-* edit;
-* forward;
-* pin;
-* select;
-* delete;
-* report.
+Хочу повторить bubble animation
+↓
+найди history/message component
+↓
+найди style
+↓
+найди animation code
+↓
+найди related asset
+↓
+разберись, как они связаны
+↓
+только после этого реализуй web version
 
-Сделай красивый context menu.
+Это важнейшее правило.
 
-На mobile — premium bottom sheet/context interaction.
+19. НИКАКИХ ВЫДУМАННЫХ ФАЙЛОВ
 
----
+Никогда не пиши:
 
-# 17. REPLIES
+Read C:\...\some_file.style
 
-Реализуй:
+пока поиском не доказал, что этот файл существует.
 
-* reply preview;
-* jump to original message;
-* quoted message;
-* reply highlighting;
-* nested visual context;
-* mobile-friendly reply UX.
+Перед чтением незнакомого пути:
 
----
+Test-Path "ABSOLUTE_PATH"
 
-# 18. REACTIONS
+либо найди его через:
 
-Создай полноценную reactions system:
+Get-ChildItem ...
+20. В КОНЦЕ КАЖДОГО ЭТАПА
 
-* reaction picker;
-* animated selection;
-* reaction counters;
-* multiple reactions;
-* realtime updates;
-* optimistic updates;
-* reaction viewer;
-* permissions.
+Кратко сообщай:
 
-Анимация должна быть красивой, но быстрой.
+Examined:
+- реальные файлы
 
----
+Learned:
+- реальные выводы
 
-# 19. MEDIA
+Changed:
+- реальные файлы моего проекта
 
-Изображения:
+Remaining:
+- следующие задачи
 
-* upload;
-* compression;
-* thumbnail;
-* preview;
-* fullscreen;
-* zoom;
-* swipe;
-* download;
-* share;
-* copy;
-* forward;
-* caption.
+Никакой воды.
 
-Видео:
+МОЯ ГЛАВНАЯ КОМАНДА
 
-* thumbnail;
-* upload progress;
-* processing state;
-* preview;
-* playback;
-* fullscreen.
+Не делай “пример Telegram”.
 
-Files:
+Не делай “Telegram-inspired пару компонентов”.
 
-* filename;
-* MIME;
-* size;
-* icon;
-* progress;
-* cancel;
-* retry;
-* download.
+Не делай быстрый CSS makeover.
 
----
+Исследуй Telegram Desktop как настоящий инженер, включая C++/Qt UI, .style, ресурсы, TGS/Lottie, SVG, анимации и UX-состояния, и используй эти знания, чтобы последовательно переделать весь мой web-messenger от авторизации до настроек в полноценный современный Telegram-class web messenger.
 
-# 20. MEDIA VIEWER
+Начинай прямо сейчас с PHASE 0.
 
-Создай premium media viewer:
+Первое действие — определить точные абсолютные пути tdesktop и web-messenger.
 
-* fullscreen;
-* zoom;
-* swipe;
-* next/previous;
-* metadata;
-* download;
-* share;
-* forward;
-* close animation.
+Не создавай ни одного UI-файла, пока эти пути не подтверждены.
 
-На mobile используй gestures.
-
----
-
-# 21. VOICE MESSAGES
-
-Реализуй:
-
-* microphone permission;
-* recording;
-* timer;
-* waveform;
-* cancel;
-* lock recording;
-* preview;
-* send;
-* playback;
-* pause;
-* playback speed.
-
-Waveform можно реализовать через Canvas.
-
----
-
-# 22. COMPOSER
-
-Composer должен быть одним из самых проработанных компонентов.
-
-Поддержка:
-
-* multiline;
-* emoji;
-* attachments;
-* image paste;
-* drag & drop;
-* reply mode;
-* edit mode;
-* formatting;
-* voice recording;
-* send animation;
-* keyboard shortcuts.
-
-По умолчанию:
-
-```text
-Enter = send
-Shift + Enter = newline
-```
-
-Сделай это настраиваемым, если архитектура позволяет.
-
----
-
-# 23. SEARCH
-
-Global search:
-
-* users;
-* chats;
-* messages;
-* media;
-* files;
-* links.
-
-Chat search:
-
-* search messages;
-* highlights;
-* next/previous;
-* jump to message.
-
-Используй правильные database indexes.
-
-Не загружай всю историю клиента ради поиска.
-
----
-
-# 24. CHAT FOLDERS
-
-Реализуй:
-
-* All;
-* Unread;
-* Personal;
-* Groups;
-* Channels;
-* custom folders.
-
-Поддержи:
-
-* include rules;
-* exclude rules;
-* ordering;
-* unread state;
-* persistence.
-
----
-
-# 25. GROUPS
-
-Реализуй полноценные группы:
-
-* create;
-* avatar;
-* name;
-* description;
-* members;
-* member search;
-* roles;
-* admins;
-* permissions;
-* invite links;
-* join requests;
-* pinned messages;
-* mute;
-* ban;
-* remove;
-* mentions;
-* reactions;
-* media;
-* search;
-* admin log.
-
-Permission system должен быть серверным.
-
-Нельзя полагаться только на frontend checks.
-
----
-
-# 26. CHANNELS
-
-Реализуй architecture для каналов:
-
-* public;
-* private;
-* username;
-* invite link;
-* subscribers;
-* admins;
-* posts;
-* reactions;
-* views;
-* pinned posts;
-* media;
-* search;
-* comments/discussions architecture.
-
----
-
-# 27. STORIES
-
-Создай stories system:
-
-* story creation;
-* photo;
-* video;
-* carousel;
-* progress;
-* tap navigation;
-* swipe navigation;
-* pause;
-* viewers;
-* reactions;
-* replies;
-* privacy;
-* expiration;
-* archive architecture.
-
-Stories должны выглядеть premium.
-
----
-
-# 28. CALLS
-
-Используй WebRTC.
-
-Поддержи:
-
-* voice call;
-* video call;
-* incoming call;
-* outgoing call;
-* accept;
-* reject;
-* mute;
-* camera;
-* device selection;
-* end call;
-* reconnect;
-* connection status;
-* PiP architecture;
-* screen sharing architecture.
-
-Если TURN server ещё не настроен — создай корректную architecture/configuration, но не притворяйся, что production calling уже работает без infrastructure.
-
----
-
-# 29. NOTIFICATIONS
-
-Создай:
-
-* browser notifications;
-* unread badges;
-* sound;
-* per-chat mute;
-* global notification settings;
-* mentions;
-* reactions;
-* calls;
-* push architecture.
-
----
-
-# 30. SETTINGS
-
-Settings должны быть полноценными.
-
-Разделы:
-
-```text
-Account
-Profile
-Privacy & Security
-Notifications & Sounds
-Appearance
-Chat Settings
-Devices
-Data & Storage
-Language
-Accessibility
-Keyboard Shortcuts
-Experimental
-About
-```
-
----
-
-# 31. APPEARANCE
-
-Настройки:
-
-* System;
-* Light;
-* Dark;
-* accent;
-* bubble appearance;
-* background;
-* font size;
-* message density;
-* animations;
-* reduced motion;
-* sidebar density.
-
-Подготовь архитектуру для custom themes.
-
----
-
-# 32. INTERNATIONALIZATION
-
-Создай i18n architecture.
-
-Минимум architecture должна позволять:
-
-* English;
-* Russian;
-* Norwegian.
-
-Не хардкодь пользовательские строки по всему проекту.
-
----
-
-# 33. ACCESSIBILITY
-
-Поддержи:
-
-* keyboard navigation;
-* focus management;
-* focus-visible;
-* ARIA;
-* screen readers;
-* sufficient contrast;
-* reduced motion;
-* semantic HTML;
-* accessible dialogs;
-* accessible menus;
-* touch target sizes.
-
----
-
-# 34. REALTIME ARCHITECTURE
-
-Создай typed realtime protocol.
-
-Events:
-
-```text
-message:new
-message:update
-message:delete
-
-reaction:add
-reaction:remove
-
-typing:start
-typing:stop
-
-presence:update
-
-chat:update
-chat:read
-
-notification:new
-
-story:new
-story:update
-
-call:incoming
-call:update
-call:end
-```
-
-Каждый event должен иметь:
-
-* type;
-* version;
-* payload;
-* IDs;
-* timestamp.
-
-Обработай:
-
-* reconnect;
-* duplicate events;
-* out-of-order events;
-* stale connections;
-* authentication;
-* permissions.
-
----
-
-# 35. OFFLINE / RECONNECT
-
-Если интернет пропал:
-
-покажи:
-
-```text
-Offline
-```
-
-При восстановлении:
-
-```text
-Reconnecting...
-```
-
-После восстановления:
-
-```text
-Connected
-```
-
-Синхронизируй:
-
-* pending messages;
-* reads;
-* reactions;
-* drafts;
-* recent state.
-
----
-
-# 36. PERFORMANCE
-
-Это критически важно.
-
-Не допускай:
-
-* рендера тысяч сообщений одновременно;
-* огромных DOM trees;
-* unnecessary rerenders;
-* тяжелых animations on main thread;
-* огромных JS bundles;
-* загрузки всех media оригиналов сразу.
-
-Используй:
-
-* virtualization;
-* pagination;
-* cursor loading;
-* lazy loading;
-* code splitting;
-* dynamic imports;
-* image optimization;
-* thumbnails;
-* caching;
-* memoization;
-* workers;
-* IndexedDB;
-* Redis;
-* database indexes.
-
-Message list должен работать плавно даже на больших чатах.
-
----
-
-# 37. SECURITY
-
-Backend должен быть authoritative.
-
-Проверяй:
-
-* authentication;
-* authorization;
-* ownership;
-* permissions;
-* input validation;
-* rate limits;
-* upload MIME;
-* file size;
-* filename safety;
-* XSS;
-* CSRF strategy;
-* session security;
-* secure cookies;
-* password security;
-* resource access.
-
-Нельзя доверять:
-
-```text
-userId
-role
-permissions
-chatId
-messageId
-```
-
-которые пришли только от frontend.
-
----
-
-# 38. ERROR HANDLING
-
-Создай единый error system.
-
-Frontend:
-
-* Error Boundary;
-* network errors;
-* retry;
-* offline state;
-* upload errors;
-* failed messages;
-* toast;
-* empty states;
-* skeleton states.
-
-Backend:
-
-* structured errors;
-* logging;
-* request IDs;
-* safe error responses.
-
-Не показывай пользователю stack traces.
-
----
-
-# 39. DESIGN SYSTEM
-
-Создай собственный UI kit.
-
-Минимум:
-
-```text
-Button
-IconButton
-Avatar
-Input
-Textarea
-SearchInput
-
-Dialog
-Drawer
-BottomSheet
-Popover
-ContextMenu
-Tooltip
-Dropdown
-
-Tabs
-SegmentedControl
-Switch
-Checkbox
-Radio
-Slider
-
-Toast
-Badge
-Skeleton
-Spinner
-Progress
-
-MessageBubble
-ChatListItem
-UserListItem
-StoryAvatar
-MediaViewer
-Composer
-VoiceRecorder
-EmojiPicker
-ReactionPicker
-```
-
-Все компоненты должны быть consistent.
-
----
-
-# 40. ICON SYSTEM
-
-Создай единый Basagram icon language.
-
-Правила:
-
-* consistent stroke width;
-* consistent optical sizing;
-* consistent corner geometry;
-* proper active/inactive states;
-* dark/light compatibility;
-* accessibility labels.
-
-Если используешь generated/custom assets — они должны быть оригинальными и соответствовать Basagram visual identity.
-
----
-
-# 41. ANIMATION SYSTEM
-
-Создай общую animation language.
-
-Принципы:
-
-* fast;
-* smooth;
-* natural;
-* spring-based where appropriate;
-* subtle;
-* purposeful.
-
-Примеры:
-
-* chat open;
-* message send;
-* reaction;
-* drawer;
-* sheet;
-* modal;
-* navigation;
-* story transitions;
-* media viewer;
-* button press;
-* hover;
-* unread badge.
-
-Поддержи:
-
-```text
-prefers-reduced-motion
-```
-
----
-
-# 42. EMPTY / LOADING / ERROR STATES
-
-Не забывай состояния:
-
-* empty chat;
-* no contacts;
-* no search results;
-* no media;
-* loading;
-* skeleton;
-* offline;
-* reconnecting;
-* upload failure;
-* message failure;
-* permission denied;
-* not found.
-
-Каждое состояние должно выглядеть частью продукта.
-
----
-
-# 43. RESPONSIVE TESTING
-
-Проверяй минимум:
-
-```text
-320
-375
-390
-430
-768
-1024
-1280
-1440
-1920
-```
-
-Проверяй:
-
-* overflow;
-* keyboard;
-* touch;
-* mouse;
-* scrolling;
-* modal placement;
-* composer;
-* sidebar;
-* navigation.
-
----
-
-# 44. ARCHITECTURE
-
-Предпочтительная структура:
-
-```text
-apps/
-  web/
-  api/
-
-packages/
-  ui/
-  types/
-  config/
-  database/
-  realtime/
-  validation/
-  utils/
-  design-system/
-```
-
-Если после анализа проекта ты найдёшь объективно лучшую архитектуру — можешь изменить структуру.
-
-Но архитектура должна быть:
-
-* modular;
-* typed;
-* maintainable;
-* scalable;
-* testable.
-
-Не создавай монолитный файл на несколько тысяч строк.
-
----
-
-# 45. API
-
-Создай нормальный API architecture.
-
-Разделы:
-
-```text
-/auth
-/users
-/profiles
-/chats
-/messages
-/media
-/reactions
-/groups
-/channels
-/stories
-/calls
-/notifications
-/settings
-/search
-/devices
-```
-
-Используй shared types/validation между frontend и backend там, где это полезно.
-
----
-
-# 46. ADMIN / MODERATION ARCHITECTURE
-
-Подготовь backend architecture для moderation:
-
-* reports;
-* blocks;
-* user moderation;
-* message moderation;
-* group moderation;
-* channel moderation;
-* audit logs;
-* abuse protection;
-* rate limiting.
-
-Не добавляй frontend admin dashboard просто ради галочки, если backend foundation ещё не готов.
-
----
-
-# 47. GENERATED VISUAL ASSETS
-
-Если для продукта нужны:
-
-* custom illustrations;
-* decorative assets;
-* onboarding artwork;
-* empty-state artwork;
-* unique icons;
-* backgrounds;
-
-создавай **оригинальные Basagram assets**.
-
-Они должны быть:
-
-* premium;
-* consistent;
-* lightweight;
-* responsive;
-* accessible.
-
-Не используй случайные stock assets, которые ломают визуальную систему.
-
----
-
-# 48. PRODUCT FEEL
-
-Basagram должен ощущаться как:
-
-> современный premium messenger, который мог бы существовать рядом с Telegram, WhatsApp, Signal, iMessage и Discord, но имеет собственный характер.
-
-Главные ощущения:
-
-```text
-Fast
-Smooth
-Premium
-Private-feeling
-Modern
-Tactile
-Elegant
-Reliable
-```
-
----
-
-# 49. НЕ ДЕЛАТЬ
-
-Не делай:
-
-* generic dashboard;
-* обычный CRUD UI;
-* огромные карточки;
-* бессмысленные gradients;
-* excessive neon;
-* excessive glass;
-* excessive blur;
-* random animations;
-* default browser controls;
-* ugly forms;
-* fake loading;
-* fake realtime;
-* fake database;
-* hardcoded user data;
-* hardcoded messages;
-* `Coming soon` вместо реализации;
-* `TODO` вместо ключевой функциональности;
-* mock backend вместо реального backend;
-* frontend-only permissions.
-
----
-
-# 50. НЕ ЗАБЫВАЙ ПРО UX
-
-Каждая функция должна иметь:
-
-```text
-loading
-success
-error
-empty
-disabled
-permission denied
-offline
-reconnecting
-```
-
-Если функция имеет realtime:
-
-```text
-optimistic state
-server confirmation
-reconciliation
-duplicate handling
-reconnect handling
-```
-
----
-
-# 51. DEVELOPMENT ORDER
-
-Работай поэтапно.
-
-## PHASE 1 — FOUNDATION
-
-* repository;
-* monorepo/app structure;
-* TypeScript;
-* Next.js;
-* backend;
-* environment;
-* MySQL;
-* migrations;
-* shared types;
-* validation;
-* base API;
-* logging.
-
-## PHASE 2 — DESIGN SYSTEM
-
-* typography;
-* colors;
-* spacing;
-* icons;
-* buttons;
-* inputs;
-* dialogs;
-* sheets;
-* navigation;
-* animation system;
-* theme system.
-
-## PHASE 3 — APPLICATION SHELL
-
-* responsive layout;
-* desktop sidebar;
-* mobile navigation;
-* chat list;
-* conversation layout;
-* profile/settings navigation.
-
-## PHASE 4 — AUTH
-
-* register;
-* login;
-* sessions;
-* logout;
-* security.
-
-## PHASE 5 — USERS / PROFILES
-
-* profile;
-* avatar;
-* username;
-* presence;
-* privacy.
-
-## PHASE 6 — PRIVATE CHATS
-
-* conversations;
-* messages;
-* pagination;
-* realtime;
-* typing;
-* reads;
-* optimistic UI.
-
-## PHASE 7 — MEDIA
-
-* uploads;
-* images;
-* videos;
-* files;
-* audio;
-* voice messages;
-* media viewer.
-
-## PHASE 8 — MESSAGE FEATURES
-
-* reactions;
-* replies;
-* forwarding;
-* editing;
-* deletion;
-* pins;
-* search;
-* link previews;
-* GIF/sticker architecture.
-
-## PHASE 9 — GROUPS
-
-* groups;
-* members;
-* roles;
-* permissions;
-* invites;
-* moderation.
-
-## PHASE 10 — CHANNELS
-
-* channels;
-* posts;
-* subscribers;
-* reactions;
-* comments architecture.
-
-## PHASE 11 — STORIES
-
-* creation;
-* viewing;
-* reactions;
-* viewers;
-* privacy;
-* expiration.
-
-## PHASE 12 — CALLS
-
-* WebRTC;
-* voice;
-* video;
-* screen sharing architecture.
-
-## PHASE 13 — NOTIFICATIONS
-
-* browser;
-* PWA;
-* notification settings.
-
-## PHASE 14 — SETTINGS
-
-* complete settings;
-* appearance;
-* privacy;
-* devices;
-* storage;
-* language;
-* accessibility.
-
-## PHASE 15 — PERFORMANCE
-
-* virtualization;
-* caching;
-* IndexedDB;
-* workers;
-* lazy loading;
-* bundle optimization.
-
-## PHASE 16 — SECURITY
-
-* authorization audit;
-* validation audit;
-* upload security;
-* rate limits;
-* session security.
-
-## PHASE 17 — POLISH
-
-* animations;
-* transitions;
-* microinteractions;
-* empty states;
-* skeletons;
-* visual consistency;
-* mobile polish;
-* desktop polish.
-
----
-
-# 52. QUALITY GATE
-
-После каждого major phase:
-
-### TypeScript
-
-```text
-tsc
-```
-
-### Lint
-
-Проверить lint.
-
-### Tests
-
-Запустить relevant tests.
-
-### Runtime
-
-Запустить development server.
-
-### Browser
-
-Проверить:
-
-* console;
-* network;
-* runtime errors;
-* hydration;
-* layout.
-
-### Responsive
-
-Проверить mobile + desktop.
-
-### Database
-
-Проверить:
-
-* migrations;
-* indexes;
-* queries;
-* constraints.
-
-### Realtime
-
-Проверить:
-
-* connect;
-* disconnect;
-* reconnect;
-* duplicate events.
-
----
-
-# 53. VISUAL QA
-
-Не ограничивайся тем, что TypeScript компилируется.
-
-Проверяй визуально:
-
-* alignment;
-* spacing;
-* typography;
-* icon sizing;
-* animations;
-* hover;
-* active states;
-* focus;
-* mobile layout;
-* desktop layout;
-* long usernames;
-* long messages;
-* empty states;
-* huge chats;
-* slow network;
-* failed uploads.
-
----
-
-# 54. EDGE CASES
-
-Проверяй:
-
-* очень длинные сообщения;
-* длинные usernames;
-* отсутствие avatar;
-* огромные images;
-* маленькие images;
-* unsupported files;
-* network disconnect;
-* server error;
-* duplicate message;
-* duplicate realtime event;
-* user deleted;
-* blocked user;
-* deleted message;
-* permissions changed;
-* multiple devices;
-* multiple browser tabs.
-
----
-
-# 55. CODE QUALITY
-
-Пиши production-quality code.
-
-Не делай:
-
-```text
-any
-```
-
-без необходимости.
-
-Не отключай TypeScript strictness ради исправления ошибки.
-
-Не прячь ошибки.
-
-Не удаляй feature ради того, чтобы tests прошли.
-
-Не делай огромные компоненты.
-
-Разделяй:
-
-```text
-UI
-state
-API
-database
-business logic
-realtime
-validation
-```
-
----
-
-# 56. AUTONOMOUS AGENT MODE
-
-Ты должен работать автономно.
-
-Не спрашивай пользователя разрешение на каждую мелочь.
-
-Если техническое решение очевидно — принимай его сам.
-
-Если появляется ошибка:
-
-1. диагностируй;
-2. найди root cause;
-3. исправь;
-4. снова проверь.
-
-Не останавливайся на:
-
-> "There is an error."
-
-Исправляй ошибку.
-
-Не останавливайся на:
-
-> "This feature requires more work."
-
-Если функция входит в задачу — реализуй её настолько полно, насколько это возможно в текущей инфраструктуре.
-
-Если external infrastructure действительно отсутствует, создай правильную architecture/configuration и явно зафиксируй dependency, но не подменяй реальную функцию фейком.
-
----
-
-# 57. НЕ ОСТАНАВЛИВАЙСЯ ПОСЛЕ LANDING PAGE
-
-Критически важно:
-
-После создания:
-
-```text
-homepage
-login
-chat UI
-```
-
-НЕ СЧИТАЙ ЗАДАЧУ ВЫПОЛНЕННОЙ.
-
-Продолжай:
-
-```text
-database
-authentication
-realtime
-messages
-media
-groups
-channels
-stories
-calls
-notifications
-settings
-security
-performance
-testing
-polish
-```
-
-Пока реально не пройдены основные product phases.
-
----
-
-# 58. RESEARCH BEFORE IMPLEMENTATION
-
-Перед каждой сложной функцией:
-
-1. изучи актуальный UX Telegram;
-2. изучи официальную документацию;
-3. изучи современные implementation patterns;
-4. изучи edge cases;
-5. спроектируй Basagram version;
-6. реализуй;
-7. протестируй;
-8. улучши UX.
-
-Не копируй.
-
-**Исследуй → спроектируй → реализуй свою систему.**
-
----
-
-# 59. GITHUB DISCIPLINE
-
-После meaningful milestones:
-
-```text
-git status
-git diff
-```
-
-Проверь изменения.
-
-Не коммить:
-
-```text
-.env
-credentials
-tokens
-private keys
-passwords
-API secrets
-```
-
-Push изменения в GitHub после логического завершения этапа.
-
----
-
-# 60. DOCUMENTATION
-
-Создай и поддерживай:
-
-```text
-README.md
-ARCHITECTURE.md
-DATABASE.md
-REALTIME.md
-DESIGN_SYSTEM.md
-SECURITY.md
-.env.example
-```
-
-Документация должна соответствовать реальному состоянию проекта.
-
----
-
-# 61. FIGMA / DESIGN INPUT
-
-Если в дальнейшем появятся:
-
-* `.fig`;
-* Figma exports;
-* screenshots;
-* exported assets;
-* design files;
-
-анализируй их полностью.
-
-Учитывай:
-
-* pages;
-* frames;
-* components;
-* variants;
-* auto-layout;
-* spacing;
-* typography;
-* colors;
-* shadows;
-* borders;
-* responsive behavior;
-* states.
-
-Figma/design assets должны рассматриваться как design source of truth, если они предоставлены.
-
----
-
-# 62. FINAL PRODUCT STANDARD
-
-Когда пользователь открывает Basagram, он должен увидеть не ощущение:
-
-> "это проект, который сделал AI".
-
-Он должен увидеть:
-
-> **"это настоящий продукт".**
-
-Каждый экран должен выглядеть завершённым.
-
-Каждая основная функция должна реально работать.
-
-Каждая анимация должна иметь смысл.
-
-Каждая кнопка должна иметь состояние.
-
-Каждая ошибка должна быть обработана.
-
-Каждый запрос должен иметь validation.
-
-Каждый backend endpoint должен проверять authorization.
-
-Каждый realtime event должен быть typed.
-
-Каждый большой список должен быть performant.
-
-Каждая mobile interaction должна быть удобной пальцем.
-
-Каждый desktop interaction должен быть удобным мышью и клавиатурой.
-
----
-
-# 63. ОСОБЕННО ВАЖНО
-
-Не пытайся использовать все технологии просто потому, что они перечислены.
-
-Правило:
-
-> **Use the simplest technology that solves the problem well.**
-
-Но если технология действительно даёт существенное преимущество — используй её.
-
-Примеры:
-
-```text
-React/TS → основной application layer
-CSS/SCSS → UI styling
-Motion → interaction animations
-SVG → icons
-Canvas → waveform/graphics
-WebGL/GLSL → GPU visual effects
-Three.js → advanced 3D only
-Rust/WASM → heavy computation only
-Workers → heavy browser computation
-MySQL → persistent data
-Redis → ephemeral/realtime infrastructure
-WebSocket → realtime
-WebRTC → calls
-IndexedDB → local cache/offline
-S3/R2 → media
-PWA → installation/offline/notifications
-```
-
----
-
-# 64. START NOW
-
-Начни с:
-
-1. inspect empty repository;
-2. inspect current Git configuration;
-3. inspect available environment variables;
-4. inspect MySQL connection/schema;
-5. design architecture;
-6. initialize project;
-7. create foundation;
-8. create design system;
-9. create application shell;
-10. continue through all phases.
-
-**Не делай production build.**
-
-**Не создавай fake messenger.**
-
-**Не ограничивайся prototype.**
-
-**Не останавливайся после первого экрана.**
-
-**Работай как команда senior engineers, product designers и infrastructure engineers.**
-
-Главная цель:
-
-# BUILD BASAGRAM
-
-Полноценный, быстрый, красивый, уникальный, responsive, realtime messenger с качеством продукта, а не демонстрационного прототипа.
-
-**Начинай работу сейчас.**
+После подтверждения путей сразу переходи к индексированию tdesktop, не спрашивая меня разрешение на каждый файл.

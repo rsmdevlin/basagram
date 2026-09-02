@@ -1,108 +1,135 @@
 'use client';
 
-import React, { useState } from 'react';
-import { SendIcon, AttachIcon, EmojiIcon, CloseIcon } from '@basagram/ui';
+import React, { useState, useRef, useEffect } from 'react';
 
 interface MessageComposerProps {
-  onSend?: (message: string) => void;
-  onSendReply?: (message: string, replyToId: string) => void;
+  onSend: (message: string) => void;
+  onTyping?: (isTyping: boolean) => void;
+  placeholder?: string;
   disabled?: boolean;
-  replyingTo?: {
-    id: string;
-    sender: string;
-    content: string;
-  };
-  onClearReply?: () => void;
+  className?: string;
 }
 
 export const MessageComposer: React.FC<MessageComposerProps> = ({
   onSend,
-  onSendReply,
-  disabled,
-  replyingTo,
-  onClearReply,
+  onTyping,
+  placeholder = 'Type a message...',
+  disabled = false,
+  className = '',
 }) => {
   const [message, setMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    // Auto-resize textarea based on content
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+    }
+  }, [message]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value);
+
+    // Handle typing indicator
+    if (!isTyping) {
+      setIsTyping(true);
+      onTyping?.(true);
+    }
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set new timeout
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      onTyping?.(false);
+    }, 3000);
+  };
 
   const handleSend = () => {
     if (message.trim()) {
-      if (replyingTo && onSendReply) {
-        onSendReply(message, replyingTo.id);
-        onClearReply?.();
-      } else if (onSend) {
-        onSend(message);
-      }
+      onSend(message.trim());
       setMessage('');
+      setIsTyping(false);
+      onTyping?.(false);
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Send message on Ctrl+Enter or Cmd+Enter
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSend();
+    }
+    // Send message on Enter (without shift)
+    else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
   return (
-    <div className="px-4 md:px-6 py-4 bg-neutral-900 border-t border-neutral-800">
-      {/* Reply Preview */}
-      {replyingTo && (
-        <div className="mb-3 p-3 bg-neutral-800 rounded-lg border-l-2 border-primary-500 flex items-start gap-2">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-primary-400">
-              Ответ на {replyingTo.sender}
-            </p>
-            <p className="text-xs text-neutral-300 truncate">{replyingTo.content}</p>
-          </div>
-          <button
-            onClick={onClearReply}
-            className="flex-shrink-0 p-1 hover:bg-neutral-700 rounded transition-colors"
-          >
-            <CloseIcon size={14} />
-          </button>
-        </div>
-      )}
+    <div
+      className={`flex items-end gap-2 px-4 py-3 bg-[var(--tg-bg)] border-t border-[var(--tg-border)] ${className}`}
+    >
+      {/* Attachment button */}
+      <button
+        className="p-2 rounded-lg hover:bg-[var(--tg-surface)] transition-colors text-[var(--tg-text)] flex-shrink-0"
+        title="Attach file"
+        disabled={disabled}
+      >
+        📎
+      </button>
 
-      <div className="flex gap-3">
-        {/* Attachments */}
-        <button
-          className="p-2 hover:bg-neutral-800 rounded-lg transition-colors text-neutral-400 hover:text-white"
-          title="Прикрепить файл"
-          disabled={disabled}
-        >
-          <AttachIcon size={20} />
-        </button>
+      {/* Emoji button */}
+      <button
+        className="p-2 rounded-lg hover:bg-[var(--tg-surface)] transition-colors text-[var(--tg-text)] flex-shrink-0"
+        title="Emoji"
+        disabled={disabled}
+      >
+        😊
+      </button>
 
-        {/* Message Input */}
+      {/* Message input */}
+      <div className="flex-1 flex items-center gap-2 bg-[var(--tg-surface)] rounded-lg px-3 py-2 border border-transparent hover:border-[var(--tg-border)] focus-within:border-[var(--tg-primary)] transition-colors">
         <textarea
+          ref={textareaRef}
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="Введите сообщение... (Shift+Enter для новой строки)"
-          className="flex-1 px-4 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none max-h-32"
+          placeholder={placeholder}
           disabled={disabled}
+          className="flex-1 bg-transparent text-[var(--tg-text)] placeholder-[var(--tg-text-tertiary)] outline-none resize-none max-h-30 text-sm"
           rows={1}
+          style={{ minHeight: '24px', maxHeight: '120px' }}
         />
-
-        {/* Emoji */}
-        <button
-          className="p-2 hover:bg-neutral-800 rounded-lg transition-colors text-neutral-400 hover:text-white"
-          title="Смайлик"
-          disabled={disabled}
-        >
-          <EmojiIcon size={20} />
-        </button>
-
-        {/* Send */}
-        <button
-          onClick={handleSend}
-          disabled={disabled || !message.trim()}
-          className="p-2 hover:bg-primary-700 rounded-lg transition-colors text-primary-500 hover:text-white disabled:text-neutral-600 disabled:hover:bg-transparent"
-          title="Отправить (Enter)"
-        >
-          <SendIcon size={20} />
-        </button>
       </div>
+
+      {/* Send button */}
+      <button
+        onClick={handleSend}
+        disabled={disabled || !message.trim()}
+        className="p-2 rounded-lg bg-[var(--tg-primary)] text-white hover:bg-[var(--tg-primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0 font-semibold"
+        title="Send message"
+      >
+        ✈️
+      </button>
     </div>
   );
 };
+
+export default MessageComposer;
