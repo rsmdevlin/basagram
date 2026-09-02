@@ -1,89 +1,127 @@
-// Local database type definitions and stubs
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '../../.env.local' });
+
+// Parse DATABASE_URL or use individual params
+const getDatabaseConfig = () => {
+  if (process.env.DATABASE_URL) {
+    // Parse mysql://user:password@host:port/database
+    const url = new URL(process.env.DATABASE_URL);
+    return {
+      host: url.hostname,
+      port: parseInt(url.port || '3306'),
+      user: url.username,
+      password: url.password,
+      database: url.pathname.slice(1),
+    };
+  }
+
+  return {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '3306'),
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'basagram',
+  };
+};
+
+const config = getDatabaseConfig();
+console.log(`Connecting to database: ${config.host}:${config.port}/${config.database}`);
+
+const pool = mysql.createPool({
+  ...config,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+});
+
 export interface User {
   id: string;
   email: string;
   username: string;
-  passwordHash: string;
-  avatar?: string;
+  display_name: string;
+  password_hash: string;
+  avatar_url?: string;
   bio?: string;
   status?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  is_online: boolean;
+  last_seen?: Date;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface Conversation {
   id: string;
-  participantIds: string[];
-  lastMessageAt?: Date;
-  createdAt: Date;
+  name?: string;
+  type: 'private' | 'group' | 'channel';
+  avatar_url?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface Message {
   id: string;
-  conversationId: string;
-  senderId: string;
+  conversation_id: string;
+  sender_id: string;
   content: string;
-  attachments?: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  status: 'sending' | 'sent' | 'read' | 'failed';
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface Group {
   id: string;
   name: string;
   description?: string;
-  avatar?: string;
-  adminId: string;
-  memberIds: string[];
-  createdAt: Date;
+  avatar_url?: string;
+  admin_id: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface Channel {
   id: string;
   name: string;
   description?: string;
-  isPublic: boolean;
-  adminId: string;
-  createdAt: Date;
+  is_public: boolean;
+  admin_id: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
-export interface Story {
-  id: string;
-  authorId: string;
-  content: string;
-  expiresAt: Date;
-  createdAt: Date;
-}
-
-export interface Call {
-  id: string;
-  callerId: string;
-  receiverId: string;
-  type: 'audio' | 'video';
-  status: 'pending' | 'active' | 'ended';
-  startedAt?: Date;
-  endedAt?: Date;
-}
-
-export interface Notification {
-  id: string;
-  userId: string;
-  type: string;
-  title: string;
-  body: string;
-  read: boolean;
-  createdAt: Date;
-}
-
-// Database query stubs
-export const query = async (sql: string, params?: any[]): Promise<any[]> => {
-  console.log('Query stub called:', sql, params);
-  return [];
+export const query = async <T = any>(sql: string, params?: any[]): Promise<T[]> => {
+  try {
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.query(sql, params || []);
+      return rows as T[];
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Database query error:', sql, params, error);
+    throw error;
+  }
 };
 
 export const execute = async (sql: string, params?: any[]): Promise<any> => {
-  console.log('Execute stub called:', sql, params);
-  return { affectedRows: 0 };
+  try {
+    const connection = await pool.getConnection();
+    try {
+      const [result] = await connection.execute(sql, params || []);
+      return result;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Database execute error:', sql, params, error);
+    throw error;
+  }
 };
 
+export const getConnection = async () => {
+  return await pool.getConnection();
+};
 
+export default pool;

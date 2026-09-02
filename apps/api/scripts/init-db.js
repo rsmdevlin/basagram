@@ -2,19 +2,23 @@ import mysql from 'mysql2/promise.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+// Load .env.local
+dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '../../.env.local') });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const DATABASE_URL = process.env.DATABASE_URL || 'mysql://gs348298:eKDxA99Mc2sf@80.242.59.112:3306/gs348298';
+const DATABASE_URL = process.env.DATABASE_URL || 'mysql://root:@localhost:3306/basagram';
 
 // Parse MySQL connection string
 function parseConnectionString(url) {
-  const match = url.match(/mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
+  const match = url.match(/mysql:\/\/([^:]+):([^@]*)@([^:]+):(\d+)\/(.+)/);
   if (!match) throw new Error('Invalid DATABASE_URL format');
 
   return {
     user: match[1],
-    password: match[2],
+    password: match[2] || '',
     host: match[3],
     port: parseInt(match[4]),
     database: match[5],
