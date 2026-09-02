@@ -7,5 +7,8 @@ export { ChatHeader } from './ChatHeader';
 export { MessageComposer } from './MessageComposer';
 export { TypingIndicator } from './TypingIndicator';
 export { MobileConversationMenu } from './MobileConversationMenu';
+export { LoginForm } from './LoginForm';
+export { RegisterForm } from './RegisterForm';
 export { TelegramLayout } from './TelegramLayout';
+
 
