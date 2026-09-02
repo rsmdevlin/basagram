@@ -6,11 +6,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 console.log('🚀 Basagram Full Stack запускается...\n');
 
-const MAIN_PORT = parseInt(process.env.PORT || '3000', 10);
+// На Render: PORT=3001 для фронтенда, API на отдельном внутреннем порту
+const FRONTEND_PORT = parseInt(process.env.PORT || '3000', 10);
 const API_PORT = 3001;
 
-console.log(`📍 Frontend PORT: ${MAIN_PORT}`);
-console.log(`📍 API PORT: ${API_PORT}\n`);
+// Если фронтенд просит 3001, используем другой порт для API
+const actualApiPort = FRONTEND_PORT === 3001 ? 3002 : 3001;
+
+console.log(`📍 Frontend PORT: ${FRONTEND_PORT}`);
+console.log(`📍 API PORT: ${actualApiPort}\n`);
 
 // Инициализируем БД
 console.log('🔄 Инициализируем БД...');
@@ -32,20 +36,20 @@ dbProcess.on('close', (code) => {
   }
 
   // БД готова, запускаем сервисы
-  console.log('\n🔄 Запускаем API на порту ' + API_PORT + '...');
+  console.log('\n🔄 Запускаем API на порту ' + actualApiPort + '...');
   spawn('node', ['apps/api/dist/index.js'], {
     cwd: __dirname,
     stdio: 'inherit',
-    env: { ...process.env, PORT: API_PORT, NODE_ENV: 'production' }
+    env: { ...process.env, PORT: actualApiPort, NODE_ENV: 'production' }
   });
 
   // Даём API время на запуск, потом стартуем фронтенд
   setTimeout(() => {
-    console.log(`🔄 Запускаем Next.js на порту ${MAIN_PORT}...`);
+    console.log(`🔄 Запускаем Next.js на порту ${FRONTEND_PORT}...`);
     spawn('npm', ['start'], {
       cwd: path.join(__dirname, 'apps/web'),
       stdio: 'inherit',
-      env: { ...process.env, PORT: MAIN_PORT, API_URL: `http://localhost:${API_PORT}`, NODE_ENV: 'production' }
+      env: { ...process.env, PORT: FRONTEND_PORT, API_URL: `http://localhost:${actualApiPort}`, NODE_ENV: 'production' }
     });
   }, 2000);
 });
