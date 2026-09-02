@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "turbo run dev --parallel",
-    "build": "turbo build",
+    "build": "cd apps/api && npm run build && cd ../../ && cd apps/web && npm run build",
+    "start": "node start.js",
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "test": "turbo test"
