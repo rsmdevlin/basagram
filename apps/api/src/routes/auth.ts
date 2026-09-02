@@ -92,18 +92,22 @@ const dbExecute = async (sql: string, params?: any[]): Promise<any> => {
 // Register
 router.post('/register', async (req: Request, res: Response) => {
   try {
+    console.log('[Auth] Register request received:', { body: req.body });
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
+      console.log('[Auth] Validation failed:', parsed.error);
       return res.status(400).json({ error: 'Ошибка валидации', details: parsed.error });
     }
 
     const { username, email, password, displayName } = parsed.data;
+    console.log('[Auth] Validated data:', { username, email, displayName });
 
     // Check if user exists
     const existing = await dbQuery<UserRow>(
       'SELECT id FROM users WHERE username = ? OR email = ?',
       [username, email]
     );
+    console.log('[Auth] Existing user check:', { count: existing.length });
 
     if (existing.length > 0) {
       return res.status(409).json({ error: 'Пользователь уже существует' });
@@ -112,6 +116,7 @@ router.post('/register', async (req: Request, res: Response) => {
     // Hash password
     const passwordHash = await argon2.hash(password);
     const userId = uuidv4();
+    console.log('[Auth] Password hashed, userId:', userId);
 
     // Create user
     await dbExecute(
@@ -119,6 +124,7 @@ router.post('/register', async (req: Request, res: Response) => {
        VALUES (?, ?, ?, ?, ?)`,
       [userId, username, displayName, email, passwordHash]
     );
+    console.log('[Auth] User created in database');
 
     // Create tokens
     const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
@@ -137,8 +143,8 @@ router.post('/register', async (req: Request, res: Response) => {
       refreshToken,
     });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ error: 'Ошибка при регистрации' });
+    console.error('[Auth] Register error:', error);
+    res.status(500).json({ error: 'Ошибка при регистрации', details: String(error) });
   }
 });
 
