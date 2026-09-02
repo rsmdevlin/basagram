@@ -425,4 +425,49 @@ router.post('/:groupId/messages', requireAuth, async (req: Request, res: Respons
   }
 });
 
+// Add reaction to group message
+router.post('/:groupId/messages/:messageId/reactions', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { groupId, messageId } = req.params;
+    const { emoji } = req.body;
+
+    if (!emoji) {
+      return res.status(400).json({ error: 'Требуется emoji' });
+    }
+
+    const reactionId = uuidv4();
+    await dbExecute(
+      `INSERT IGNORE INTO group_message_reactions (id, message_id, user_id, emoji)
+       VALUES (?, ?, ?, ?)`,
+      [reactionId, messageId, userId, emoji]
+    );
+
+    res.status(201).json({ success: true });
+  } catch (error) {
+    console.error('[Group Message Reaction Add] Error:', error);
+    res.status(500).json({ error: 'Ошибка при добавлении реакции' });
+  }
+});
+
+// Delete message from group
+router.delete('/:groupId/messages/:messageId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { messageId } = req.params;
+
+    await dbExecute(
+      `UPDATE group_messages SET is_deleted = TRUE, deleted_at = NOW()
+       WHERE id = ? AND sender_id = ?`,
+      [messageId, userId]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Group Message Delete] Error:', error);
+    res.status(500).json({ error: 'Ошибка при удалении сообщения' });
+  }
+});
+
 export default router;
+
