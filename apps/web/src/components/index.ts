@@ -6,4 +6,6 @@ export { ConversationList } from './ConversationList';
 export { ChatHeader } from './ChatHeader';
 export { MessageComposer } from './MessageComposer';
 export { TypingIndicator } from './TypingIndicator';
+export { MobileConversationMenu } from './MobileConversationMenu';
 export { TelegramLayout } from './TelegramLayout';
+
