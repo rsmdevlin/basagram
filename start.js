@@ -1,9 +1,8 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createProxyMiddleware } from 'http-proxy-middleware';
-import express from 'express';
 import http from 'http';
+import { URL } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -43,38 +42,45 @@ setTimeout(() => {
   // Запускаем прокси на основном PORT
   setTimeout(() => {
     const PORT = process.env.PORT || 3000;
-    const app = express();
 
     console.log(`\n🔄 Запускаем прокси на порту ${PORT}...\n`);
 
-    // Прокси для API запросов
-    app.use('/api', createProxyMiddleware({
-      target: 'http://localhost:3001',
-      changeOrigin: true,
-      pathRewrite: {
-        '^/api': '/api'
-      },
-      logLevel: 'warn'
-    }));
+    const server = http.createServer((req, res) => {
+      const isApiRequest = req.url.startsWith('/api/') || req.url.startsWith('/health');
+      const targetPort = isApiRequest ? 3001 : 3000;
+      const targetHost = 'localhost';
 
-    // Прокси для health проверок
-    app.use('/health', createProxyMiddleware({
-      target: 'http://localhost:3001',
-      changeOrigin: true,
-      logLevel: 'warn'
-    }));
+      const proxyReq = http.request(
+        {
+          hostname: targetHost,
+          port: targetPort,
+          path: req.url,
+          method: req.method,
+          headers: req.headers,
+        },
+        (proxyRes) => {
+          res.writeHead(proxyRes.statusCode, proxyRes.headers);
+          proxyRes.pipe(res);
+        }
+      );
 
-    // Всё остальное идёт на фронтенд
-    app.use(createProxyMiddleware({
-      target: 'http://localhost:3000',
-      changeOrigin: true,
-      ws: true,
-      logLevel: 'warn'
-    }));
+      proxyReq.on('error', (err) => {
+        console.error('Proxy error:', err);
+        res.writeHead(503);
+        res.end('Service Unavailable');
+      });
 
-    app.listen(PORT, () => {
+      req.pipe(proxyReq);
+    });
+
+    server.listen(PORT, () => {
       console.log(`✅ Прокси запущен на порту ${PORT}`);
       console.log(`🎉 Basagram готов! Откройте https://basagrams.onrender.com\n`);
+    });
+
+    server.on('error', (err) => {
+      console.error('❌ Ошибка прокси сервера:', err);
+      process.exit(1);
     });
   }, 3000);
 }, 3000);
