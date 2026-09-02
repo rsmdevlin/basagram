@@ -42,10 +42,10 @@ dbProcess.on('close', (code) => {
   // Даём API время на запуск, потом стартуем фронтенд
   setTimeout(() => {
     console.log(`🔄 Запускаем Next.js на порту ${MAIN_PORT}...`);
-    spawn('next', ['start', '-p', String(MAIN_PORT)], {
+    spawn('npm', ['start'], {
       cwd: path.join(__dirname, 'apps/web'),
       stdio: 'inherit',
-      env: { ...process.env, API_URL: `http://localhost:${API_PORT}`, NODE_ENV: 'production' }
+      env: { ...process.env, PORT: MAIN_PORT, API_URL: `http://localhost:${API_PORT}`, NODE_ENV: 'production' }
     });
   }, 2000);
 });
