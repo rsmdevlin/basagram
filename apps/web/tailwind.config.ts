@@ -9,6 +9,29 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Telegram colors from tdesktop
+        telegram: {
+          blue: '#0088cc',
+          'blue-light': '#31a3f1',
+          accent: '#3892db',
+          primary: '#0088cc',
+          text: '#000000',
+          'text-secondary': '#70777b',
+          border: '#e3e6e8',
+          'bg-hover': '#f5f7f8',
+          'bg-selected': '#f2f6fa',
+        },
+        // Avatar colors
+        avatar: {
+          red: '#ff5555',
+          green: '#64bf47',
+          yellow: '#ffab00',
+          blue: '#4f9cd9',
+          purple: '#9884e8',
+          pink: '#e671a5',
+          cyan: '#47bcd1',
+          orange: '#ff8c44',
+        },
         primary: {
           50: '#f0f4ff',
           100: '#e0e9ff',
