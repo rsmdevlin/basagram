@@ -34,7 +34,7 @@ router.post('/register', async (req: Request, res: Response) => {
     const { username, email, password, displayName } = parsed.data;
 
     // Check if user exists
-    const existing = await query<UserRow[]>(
+    const existing = await query<UserRow>(
       'SELECT id FROM users WHERE username = ? OR email = ?',
       [username, email]
     );
@@ -87,7 +87,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const { email, password } = parsed.data;
 
     // Find user
-    const users = await query<UserRow[]>(
+    const users = await query<UserRow>(
       'SELECT id, email, password_hash FROM users WHERE email = ?',
       [email]
     );
@@ -109,7 +109,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const refreshToken = jwt.sign({ userId: user.id }, REFRESH_SECRET, { expiresIn: '30d' });
 
     // Get full user info
-    const fullUsers = await query<UserRow[]>(
+    const fullUsers = await query<UserRow>(
       'SELECT * FROM users WHERE id = ?',
       [user.id]
     );
@@ -174,7 +174,7 @@ router.get('/me', async (req: Request, res: Response) => {
     const token = authHeader.slice(7);
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
 
-    const users = await query<UserRow[]>(
+    const users = await query<UserRow>(
       'SELECT * FROM users WHERE id = ?',
       [decoded.userId]
     );
