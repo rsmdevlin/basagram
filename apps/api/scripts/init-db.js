@@ -32,8 +32,28 @@ async function initializeDatabase() {
     const connection = await mysql.createConnection(config);
     console.log('✅ Успешно подключено к базе данных!');
 
-    // Read and execute migration
-    const migrationPath = path.join(__dirname, 'migrations', '001_initial_schema.sql');
+    // Read and execute migration - try multiple paths
+    let migrationPath = path.join(__dirname, '..', 'migrations', '001_initial_schema.sql');
+    console.log(`📂 Ищу миграцию в: ${migrationPath}`);
+
+    if (!fs.existsSync(migrationPath)) {
+      migrationPath = path.join(__dirname, '../../apps/api/migrations', '001_initial_schema.sql');
+      console.log(`📂 Не найдено, пробую: ${migrationPath}`);
+    }
+
+    if (!fs.existsSync(migrationPath)) {
+      migrationPath = path.join(process.cwd(), 'apps/api/migrations', '001_initial_schema.sql');
+      console.log(`📂 Не найдено, пробую: ${migrationPath}`);
+    }
+
+    if (!fs.existsSync(migrationPath)) {
+      console.error(`❌ Файл миграции не найден ни по одному пути!`);
+      console.log(`   __dirname: ${__dirname}`);
+      console.log(`   cwd: ${process.cwd()}`);
+      throw new Error(`Migration file not found at ${migrationPath}`);
+    }
+
+    console.log(`✅ Файл миграции найден!`);
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
     // Split by semicolon and execute each statement
