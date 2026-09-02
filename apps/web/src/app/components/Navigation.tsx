@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'channels', label: 'Каналы', path: '/channels', icon: '#️⃣' },
   { id: 'calls', label: 'Звонки', path: '/calls', icon: '📞' },
   { id: 'stories', label: 'Истории', path: '/stories', icon: '📖' },
+  { id: 'contacts', label: 'Контакты', path: '/contacts', icon: '👤' },
   { id: 'settings', label: 'Параметры', path: '/settings', icon: '⚙️' },
 ];
 
@@ -71,7 +72,7 @@ export default function Navigation() {
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-telegram-border flex justify-around items-center h-16 z-40">
-        {NAV_ITEMS.slice(0, 5).map((item) => {
+        {NAV_ITEMS.slice(0, 6).map((item) => {
           const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
           return (
             <Link
@@ -106,14 +107,17 @@ export default function Navigation() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="space-y-2">
-              <Link
-                href="/settings"
-                onClick={() => setShowMobileMenu(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-telegram-bg-hover transition"
-              >
-                <span className="text-xl">⚙️</span>
-                <span className="text-telegram-text font-medium">Параметры</span>
-              </Link>
+              {NAV_ITEMS.slice(6).map((item) => (
+                <Link
+                  key={item.id}
+                  href={item.path}
+                  onClick={() => setShowMobileMenu(false)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-telegram-bg-hover transition"
+                >
+                  <span className="text-xl">{item.icon}</span>
+                  <span className="text-telegram-text font-medium">{item.label}</span>
+                </Link>
+              ))}
             </div>
           </div>
         </div>

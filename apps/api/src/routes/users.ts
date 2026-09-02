@@ -1,62 +1,93 @@
 import { Router, Request, Response } from 'express';
-import { query } from '@basagram/database';
+import { v4 as uuidv4 } from 'uuid';
+import mysql from 'mysql2/promise';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-interface UserRow {
-  id: string;
-  username: string;
-  display_name: string;
-  avatar_url?: string;
-  bio?: string;
-  is_online: boolean;
-  last_seen?: Date;
-  created_at: Date;
-}
+let pool: mysql.Pool;
 
-// Get user by ID
-router.get('/:userId', async (req: Request, res: Response) => {
-  try {
-    const { userId } = req.params;
+const getPool = async () => {
+  if (!pool) {
+    const getDatabaseConfig = () => {
+      if (process.env.DATABASE_URL) {
+        try {
+          const url = new URL(process.env.DATABASE_URL);
+          return {
+            host: url.hostname,
+            port: parseInt(url.port || '3306'),
+            user: url.username,
+            password: url.password,
+            database: url.pathname.slice(1),
+          };
+        } catch (e) {
+          console.error('Failed to parse DATABASE_URL:', e);
+        }
+      }
 
-    const users = await query<UserRow[]>(
-      'SELECT id, username, display_name, avatar_url, bio, is_online, last_seen, created_at FROM users WHERE id = ?',
-      [userId]
-    );
+      return {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '3306'),
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'basagram',
+      };
+    };
 
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'Пользователь не найден' });
-    }
-
-    const user = users[0];
-    res.json({
-      id: user.id,
-      username: user.username,
-      displayName: user.display_name,
-      avatar: user.avatar_url,
-      bio: user.bio,
-      isOnline: user.is_online,
-      lastSeen: user.last_seen,
-      createdAt: user.created_at,
+    const config = getDatabaseConfig();
+    pool = mysql.createPool({
+      ...config,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
     });
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ error: 'Ошибка при получении пользователя' });
   }
-});
+  return pool;
+};
+
+const dbQuery = async <T = any>(sql: string, params?: any[]): Promise<T[]> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
+  try {
+    const [rows] = await connection.query(sql, params || []);
+    return rows as T[];
+  } finally {
+    connection.release();
+  }
+};
+
+const dbExecute = async (sql: string, params?: any[]): Promise<any> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
+  try {
+    const [result] = await connection.execute(sql, params || []);
+    return result;
+  } finally {
+    connection.release();
+  }
+};
 
 // Search users
-router.get('/search/:query', async (req: Request, res: Response) => {
+router.get('/search', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { query: searchQuery } = req.params;
-    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const { q } = req.query;
 
-    const users = await query<UserRow[]>(
-      `SELECT id, username, display_name, avatar_url, is_online
-       FROM users
-       WHERE username LIKE ? OR display_name LIKE ?
-       LIMIT ?`,
-      [`%${searchQuery}%`, `%${searchQuery}%`, limit]
+    if (!q || typeof q !== 'string' || q.length < 2) {
+      return res.json([]);
+    }
+
+    const users = await dbQuery<any>(
+      `SELECT
+        u.id,
+        u.username,
+        u.display_name,
+        u.avatar_url,
+        u.is_online
+      FROM users u
+      WHERE (u.username LIKE ? OR u.display_name LIKE ?)
+      AND u.id != ?
+      LIMIT 20`,
+      [`%${q}%`, `%${q}%`, (req as any).userId]
     );
 
     res.json(
@@ -69,8 +100,130 @@ router.get('/search/:query', async (req: Request, res: Response) => {
       }))
     );
   } catch (error) {
-    console.error('Search users error:', error);
-    res.status(500).json({ error: 'Ошибка при поиске пользователей' });
+    console.error('[Users Search] Error:', error);
+    res.status(500).json({ error: 'Ошибка при поиске' });
+  }
+});
+
+// Get user contacts
+router.get('/contacts', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+
+    const contacts = await dbQuery<any>(
+      `SELECT
+        u.id,
+        u.username,
+        u.display_name,
+        u.avatar_url,
+        u.is_online,
+        c.is_favorite
+      FROM contacts c
+      LEFT JOIN users u ON u.id = c.contact_id
+      WHERE c.user_id = ?
+      ORDER BY u.display_name ASC`,
+      [userId]
+    );
+
+    res.json(
+      contacts.map((c) => ({
+        id: c.id,
+        username: c.username,
+        displayName: c.display_name,
+        avatar: c.avatar_url,
+        isOnline: c.is_online,
+        isFavorite: c.is_favorite,
+      }))
+    );
+  } catch (error) {
+    console.error('[Contacts Get] Error:', error);
+    res.status(500).json({ error: 'Ошибка при загрузке контактов' });
+  }
+});
+
+// Add contact
+router.post('/contacts', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { userId: contactId } = req.body;
+
+    if (!contactId) {
+      return res.status(400).json({ error: 'Требуется contactId' });
+    }
+
+    // Check if already a contact
+    const existing = await dbQuery<any>(
+      `SELECT id FROM contacts WHERE user_id = ? AND contact_id = ?`,
+      [userId, contactId]
+    );
+
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'Уже в контактах' });
+    }
+
+    await dbExecute(
+      `INSERT INTO contacts (id, user_id, contact_id) VALUES (?, ?, ?)`,
+      [uuidv4(), userId, contactId]
+    );
+
+    const contact = await dbQuery<any>(
+      `SELECT u.* FROM users u WHERE u.id = ?`,
+      [contactId]
+    );
+
+    if (!contact.length) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+
+    const c = contact[0];
+    res.status(201).json({
+      id: c.id,
+      username: c.username,
+      displayName: c.display_name,
+      avatar: c.avatar_url,
+      isOnline: c.is_online,
+      isFavorite: false,
+    });
+  } catch (error) {
+    console.error('[Contact Add] Error:', error);
+    res.status(500).json({ error: 'Ошибка при добавлении контакта' });
+  }
+});
+
+// Remove contact
+router.delete('/contacts/:contactId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { contactId } = req.params;
+
+    await dbExecute(
+      `DELETE FROM contacts WHERE user_id = ? AND contact_id = ?`,
+      [userId, contactId]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Contact Remove] Error:', error);
+    res.status(500).json({ error: 'Ошибка при удалении контакта' });
+  }
+});
+
+// Toggle favorite
+router.patch('/contacts/:contactId/favorite', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { contactId } = req.params;
+    const { isFavorite } = req.body;
+
+    await dbExecute(
+      `UPDATE contacts SET is_favorite = ? WHERE user_id = ? AND contact_id = ?`,
+      [isFavorite ? 1 : 0, userId, contactId]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Contact Favorite] Error:', error);
+    res.status(500).json({ error: 'Ошибка при обновлении избранного' });
   }
 });
 
