@@ -46,6 +46,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const connectedUsers = new Map<string, { socket: Socket; userId: string }>();
 
 // Middleware
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(compressionMiddleware);
 app.use(helmetMiddleware);
