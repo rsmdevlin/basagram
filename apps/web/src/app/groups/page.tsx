@@ -1,13 +1,31 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import useSocket from '../hooks/useSocket';
+
+interface User {
+  id: string;
+  username: string;
+  displayName: string;
+  avatar?: string;
+}
 
 interface GroupMember {
   id: string;
   username: string;
   displayName: string;
   role: 'member' | 'moderator' | 'admin';
+}
+
+interface GroupMessage {
+  id: string;
+  groupId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+  isEdited?: boolean;
 }
 
 interface Group {
@@ -22,14 +40,50 @@ interface Group {
 
 export default function GroupsPage() {
   const router = useRouter();
+  const { socket, isConnected } = useSocket();
+  const [user, setUser] = useState<User | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [members, setMembers] = useState<GroupMember[]>([]);
+  const [messages, setMessages] = useState<GroupMessage[]>([]);
+  const [messageText, setMessageText] = useState('');
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Load current user
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          router.push('/login');
+          return;
+        }
+
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) {
+          router.push('/login');
+          return;
+        }
+
+        const userData = await res.json();
+        setUser(userData);
+      } catch (error) {
+        console.error('Failed to load user:', error);
+        router.push('/login');
+      }
+    };
+
+    loadUser();
+  }, [router]);
+
+  // Load groups
   useEffect(() => {
     const loadGroups = async () => {
       try {
@@ -52,6 +106,7 @@ export default function GroupsPage() {
     loadGroups();
   }, []);
 
+  // Load group members when selected
   useEffect(() => {
     if (!selectedGroupId) return;
 
@@ -73,6 +128,49 @@ export default function GroupsPage() {
 
     loadGroupMembers();
   }, [selectedGroupId]);
+
+  // Load group messages
+  useEffect(() => {
+    if (!selectedGroupId) return;
+
+    const loadMessages = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/groups/${selectedGroupId}/messages`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        setMessages(data);
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      }
+    };
+
+    loadMessages();
+  }, [selectedGroupId]);
+
+  // Socket listeners
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    socket.on('group:message:new', (msg: GroupMessage) => {
+      if (msg.groupId === selectedGroupId) {
+        setMessages((prev) => [...prev, msg]);
+      }
+    });
+
+    return () => {
+      socket.off('group:message:new');
+    };
+  }, [socket, isConnected, selectedGroupId]);
+
+  // Scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleCreateGroup = async () => {
     if (!groupName.trim()) return;
@@ -103,6 +201,30 @@ export default function GroupsPage() {
     }
   };
 
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !selectedGroupId || !user) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/groups/${selectedGroupId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content: messageText }),
+      });
+
+      if (res.ok) {
+        setMessageText('');
+        const newMessage = await res.json();
+        socket?.emit('group:message:send', newMessage);
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -112,97 +234,143 @@ export default function GroupsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-6xl mx-auto p-4">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-telegram-text">Группы</h1>
-          <button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="bg-telegram-blue text-white px-6 py-2 rounded-lg hover:bg-telegram-accent transition"
-          >
-            + Создать группу
-          </button>
-        </div>
+    <div className="min-h-screen bg-white md:ml-20">
+      <div className="max-w-6xl mx-auto h-screen flex">
+        {/* Groups List Sidebar */}
+        <div className="w-full md:w-80 border-r border-telegram-border flex flex-col">
+          <div className="p-4 border-b border-telegram-border">
+            <h1 className="text-xl font-bold text-telegram-text">Группы</h1>
+          </div>
 
-        {showCreateForm && (
-          <div className="bg-telegram-bg-hover p-6 rounded-lg mb-6 border border-telegram-border">
-            <h2 className="text-lg font-semibold text-telegram-text mb-4">Новая группа</h2>
-            <div className="space-y-4">
+          {showCreateForm ? (
+            <div className="p-4 border-b border-telegram-border space-y-2">
               <input
                 type="text"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Название группы"
-                className="w-full px-4 py-2 border border-telegram-border rounded-lg focus:outline-none focus:border-telegram-blue"
+                placeholder="Название"
+                className="w-full px-3 py-2 border border-telegram-border rounded-lg text-sm focus:outline-none focus:border-telegram-blue"
               />
               <textarea
                 value={groupDescription}
                 onChange={(e) => setGroupDescription(e.target.value)}
-                placeholder="Описание группы"
-                className="w-full px-4 py-2 border border-telegram-border rounded-lg focus:outline-none focus:border-telegram-blue"
-                rows={3}
+                placeholder="Описание"
+                className="w-full px-3 py-2 border border-telegram-border rounded-lg text-sm focus:outline-none focus:border-telegram-blue resize-none"
+                rows={2}
               />
               <div className="flex gap-2">
                 <button
                   onClick={handleCreateGroup}
-                  className="bg-telegram-blue text-white px-6 py-2 rounded-lg hover:bg-telegram-accent transition"
+                  className="flex-1 bg-telegram-blue text-white py-2 rounded-lg text-sm hover:bg-telegram-accent transition"
                 >
                   Создать
                 </button>
                 <button
                   onClick={() => setShowCreateForm(false)}
-                  className="bg-telegram-bg-hover text-telegram-text px-6 py-2 rounded-lg hover:bg-telegram-border transition border border-telegram-border"
+                  className="flex-1 bg-telegram-bg-hover text-telegram-text py-2 rounded-lg text-sm border border-telegram-border"
                 >
                   Отмена
                 </button>
               </div>
             </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {groups.map((group) => (
-            <div
-              key={group.id}
-              onClick={() => setSelectedGroupId(group.id)}
-              className={`p-4 rounded-lg border cursor-pointer transition ${
-                selectedGroupId === group.id
-                  ? 'border-telegram-blue bg-telegram-bg-selected'
-                  : 'border-telegram-border hover:bg-telegram-bg-hover'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-full bg-telegram-blue flex items-center justify-center text-white font-bold flex-shrink-0">
-                  {group.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-telegram-text">{group.name}</h3>
-                  {group.description && (
-                    <p className="text-sm text-telegram-text-secondary line-clamp-2">{group.description}</p>
-                  )}
-                  <p className="text-xs text-telegram-text-secondary mt-2">{group.membersCount} участников</p>
-                </div>
-              </div>
+          ) : (
+            <div className="p-4 border-b border-telegram-border">
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="w-full bg-telegram-blue text-white py-2 rounded-lg hover:bg-telegram-accent transition text-sm font-semibold"
+              >
+                + Создать группу
+              </button>
             </div>
-          ))}
+          )}
+
+          <div className="flex-1 overflow-y-auto">
+            {groups.length === 0 ? (
+              <div className="p-4 text-center text-telegram-text-secondary text-sm">
+                <p>Нет групп</p>
+              </div>
+            ) : (
+              groups.map((group) => (
+                <div
+                  key={group.id}
+                  onClick={() => setSelectedGroupId(group.id)}
+                  className={`p-3 border-b border-telegram-border cursor-pointer transition ${
+                    selectedGroupId === group.id ? 'bg-telegram-bg-selected' : 'hover:bg-telegram-bg-hover'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-telegram-blue flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {group.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-telegram-text truncate text-sm">{group.name}</p>
+                      <p className="text-xs text-telegram-text-secondary">{group.membersCount} участников</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        {selectedGroupId && (
-          <div className="mt-6 bg-telegram-bg-hover p-6 rounded-lg border border-telegram-border">
-            <h2 className="text-lg font-semibold text-telegram-text mb-4">Участники</h2>
-            <div className="space-y-2">
-              {members.map((member) => (
-                <div key={member.id} className="flex items-center justify-between p-2 bg-white rounded-lg">
-                  <div>
-                    <p className="font-medium text-telegram-text">{member.displayName}</p>
-                    <p className="text-xs text-telegram-text-secondary">{member.username}</p>
+        {/* Chat Area */}
+        {selectedGroupId ? (
+          <div className="hidden md:flex flex-1 flex-col">
+            {/* Chat Header */}
+            <div className="p-4 border-b border-telegram-border flex items-center justify-between bg-white">
+              <h2 className="font-semibold text-telegram-text">
+                {groups.find((g) => g.id === selectedGroupId)?.name}
+              </h2>
+              <span className="text-xs text-telegram-text-secondary">{members.length} участников</span>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-xs px-4 py-2 rounded-2xl ${
+                      msg.senderId === user?.id
+                        ? 'bg-telegram-blue text-white rounded-br-none'
+                        : 'bg-telegram-bg-hover text-telegram-text rounded-bl-none'
+                    }`}
+                  >
+                    {msg.senderId !== user?.id && (
+                      <p className="text-xs font-semibold opacity-75 mb-1">{msg.senderName}</p>
+                    )}
+                    <p className="break-words text-sm">{msg.content}</p>
                   </div>
-                  <span className="text-xs bg-telegram-blue text-white px-3 py-1 rounded-full">
-                    {member.role === 'admin' ? 'Админ' : member.role === 'moderator' ? 'Модератор' : 'Участник'}
-                  </span>
                 </div>
               ))}
+              <div ref={messagesEndRef} />
             </div>
+
+            {/* Input */}
+            <div className="p-4 border-t border-telegram-border">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  placeholder="Сообщение..."
+                  className="flex-1 px-4 py-2 border border-telegram-border rounded-full focus:outline-none focus:border-telegram-blue text-sm"
+                />
+                <button
+                  onClick={handleSendMessage}
+                  className="bg-telegram-blue text-white px-6 py-2 rounded-full hover:bg-telegram-accent transition text-sm font-semibold"
+                >
+                  Отправить
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="hidden md:flex flex-1 items-center justify-center text-telegram-text-secondary">
+            <p>Выберите группу</p>
           </div>
         )}
       </div>

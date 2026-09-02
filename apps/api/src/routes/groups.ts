@@ -1,314 +1,310 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import jwt from 'jsonwebtoken';
-import { query, execute } from '@basagram/database';
+import mysql from 'mysql2/promise';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+let pool: mysql.Pool;
 
-// Create group
-router.post('/', async (req: Request, res: Response) => {
+const getPool = async () => {
+  if (!pool) {
+    const getDatabaseConfig = () => {
+      if (process.env.DATABASE_URL) {
+        try {
+          const url = new URL(process.env.DATABASE_URL);
+          return {
+            host: url.hostname,
+            port: parseInt(url.port || '3306'),
+            user: url.username,
+            password: url.password,
+            database: url.pathname.slice(1),
+          };
+        } catch (e) {
+          console.error('Failed to parse DATABASE_URL:', e);
+        }
+      }
+
+      return {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '3306'),
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'basagram',
+      };
+    };
+
+    const config = getDatabaseConfig();
+    pool = mysql.createPool({
+      ...config,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+  }
+  return pool;
+};
+
+const dbQuery = async <T = any>(sql: string, params?: any[]): Promise<T[]> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const [rows] = await connection.query(sql, params || []);
+    return rows as T[];
+  } finally {
+    connection.release();
+  }
+};
+
+const dbExecute = async (sql: string, params?: any[]): Promise<any> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
+  try {
+    const [result] = await connection.execute(sql, params || []);
+    return result;
+  } finally {
+    connection.release();
+  }
+};
+
+// Get all groups for user
+router.get('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    if (!userId) {
       return res.status(401).json({ error: 'Требуется авторизация' });
     }
 
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const { name, description, members } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ error: 'name не предоставлено' });
-    }
-
-    // Create conversation
-    const conversationId = uuidv4();
-    await execute(
-      `INSERT INTO conversations
-       (id, name, type, created_by_id)
-       VALUES (?, ?, 'group', ?)`,
-      [conversationId, name, userId]
+    const groups = await dbQuery<any>(
+      `SELECT
+        g.id,
+        g.name,
+        g.description,
+        g.avatar_url,
+        g.creator_id,
+        COUNT(DISTINCT gm.user_id) as members_count,
+        g.created_at
+      FROM groups g
+      LEFT JOIN group_members gm ON gm.group_id = g.id
+      WHERE EXISTS (
+        SELECT 1 FROM group_members WHERE group_id = g.id AND user_id = ?
+      )
+      GROUP BY g.id
+      ORDER BY g.created_at DESC`,
+      [userId]
     );
 
-    // Add creator as admin
-    await execute(
-      `INSERT INTO conversation_members
-       (id, conversation_id, user_id, role)
-       VALUES (?, ?, ?, 'admin')`,
-      [uuidv4(), conversationId, userId]
+    res.json(
+      groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        avatar: g.avatar_url,
+        creatorId: g.creator_id,
+        membersCount: g.members_count || 0,
+        createdAt: g.created_at,
+      }))
     );
+  } catch (error) {
+    console.error('[Groups Get] Error:', error);
+    res.status(500).json({ error: 'Ошибка при загрузке групп' });
+  }
+});
 
-    // Add other members as regular members
-    if (members && Array.isArray(members)) {
-      for (const memberId of members) {
-        if (memberId !== userId) {
-          await execute(
-            `INSERT INTO conversation_members
-             (id, conversation_id, user_id, role)
-             VALUES (?, ?, ?, 'member')`,
-            [uuidv4(), conversationId, memberId]
-          );
-        }
-      }
+// Create group
+router.post('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { name, description } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Требуется название группы' });
     }
 
-    // Get full group data
-    const group = await query(
-      'SELECT * FROM conversations WHERE id = ?',
-      [conversationId]
+    const groupId = uuidv4();
+    await dbExecute(
+      `INSERT INTO groups (id, name, description, creator_id)
+       VALUES (?, ?, ?, ?)`,
+      [groupId, name.trim(), description || null, userId]
     );
 
-    const groupMembers = await query(
-      `SELECT u.id, u.username, u.display_name, u.avatar_url, cm.role
-       FROM conversation_members cm
-       JOIN users u ON cm.user_id = u.id
-       WHERE cm.conversation_id = ?
-       ORDER BY cm.role DESC, u.display_name ASC`,
-      [conversationId]
+    // Add creator as admin member
+    await dbExecute(
+      `INSERT INTO group_members (id, group_id, user_id, role)
+       VALUES (?, ?, ?, ?)`,
+      [uuidv4(), groupId, userId, 'admin']
     );
 
     res.status(201).json({
-      id: group[0].id,
-      name: group[0].name,
-      type: 'group',
-      members: groupMembers,
-      createdBy: userId,
+      id: groupId,
+      name: name.trim(),
+      description: description || null,
+      creatorId: userId,
+      membersCount: 1,
+      createdAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Create group error:', error);
+    console.error('[Group Create] Error:', error);
     res.status(500).json({ error: 'Ошибка при создании группы' });
   }
 });
 
 // Get group details
-router.get('/:conversationId', async (req: Request, res: Response) => {
+router.get('/:groupId', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { conversationId } = req.params;
+    const { groupId } = req.params;
 
-    const groups = await query(
-      'SELECT * FROM conversations WHERE id = ? AND type = ?',
-      [conversationId, 'group']
+    const group = await dbQuery<any>(
+      `SELECT
+        g.id,
+        g.name,
+        g.description,
+        g.avatar_url,
+        g.creator_id,
+        g.created_at
+      FROM groups g
+      WHERE g.id = ?`,
+      [groupId]
     );
 
-    if (groups.length === 0) {
+    if (!group.length) {
       return res.status(404).json({ error: 'Группа не найдена' });
     }
 
-    const members = await query(
-      `SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_online,
-              cm.role, cm.muted_until, cm.joined_at
-       FROM conversation_members cm
-       JOIN users u ON cm.user_id = u.id
-       WHERE cm.conversation_id = ?
-       ORDER BY cm.role DESC, u.display_name ASC`,
-      [conversationId]
-    );
-
+    const g = group[0];
     res.json({
-      ...groups[0],
-      members,
-      memberCount: members.length,
+      id: g.id,
+      name: g.name,
+      description: g.description,
+      avatar: g.avatar_url,
+      creatorId: g.creator_id,
+      createdAt: g.created_at,
     });
   } catch (error) {
-    console.error('Get group error:', error);
-    res.status(500).json({ error: 'Ошибка при получении группы' });
+    console.error('[Group Get] Error:', error);
+    res.status(500).json({ error: 'Ошибка при загрузке группы' });
   }
 });
 
-// Update group info (admin only)
-router.put('/:conversationId', async (req: Request, res: Response) => {
+// Get group members
+router.get('/:groupId/members', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
+    const { groupId } = req.params;
 
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const { conversationId } = req.params;
-    const { name } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ error: 'name не предоставлено' });
-    }
-
-    // Check if user is admin
-    const admin = await query(
-      `SELECT role FROM conversation_members
-       WHERE conversation_id = ? AND user_id = ? AND role = 'admin'`,
-      [conversationId, userId]
+    const members = await dbQuery<any>(
+      `SELECT
+        u.id,
+        u.username,
+        u.display_name,
+        u.avatar_url,
+        gm.role,
+        gm.joined_at
+      FROM group_members gm
+      LEFT JOIN users u ON u.id = gm.user_id
+      WHERE gm.group_id = ?
+      ORDER BY gm.role = 'admin' DESC, u.display_name ASC`,
+      [groupId]
     );
 
-    if (admin.length === 0) {
-      return res.status(403).json({ error: 'Только администратор может редактировать группу' });
-    }
-
-    await execute(
-      'UPDATE conversations SET name = ? WHERE id = ?',
-      [name, conversationId]
+    res.json(
+      members.map((m) => ({
+        id: m.id,
+        username: m.username,
+        displayName: m.display_name,
+        avatar: m.avatar_url,
+        role: m.role,
+        joinedAt: m.joined_at,
+      }))
     );
-
-    const updated = await query(
-      'SELECT * FROM conversations WHERE id = ?',
-      [conversationId]
-    );
-
-    res.json(updated[0]);
   } catch (error) {
-    console.error('Update group error:', error);
-    res.status(500).json({ error: 'Ошибка при обновлении группы' });
+    console.error('[Group Members Get] Error:', error);
+    res.status(500).json({ error: 'Ошибка при загрузке участников' });
   }
 });
 
 // Add member to group
-router.post('/:conversationId/members', async (req: Request, res: Response) => {
+router.post('/:groupId/members', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const { conversationId } = req.params;
-    const { userId: newMemberId } = req.body;
+    const userId = (req as any).userId;
+    const { groupId } = req.params;
+    const { newMemberId } = req.body;
 
     if (!newMemberId) {
-      return res.status(400).json({ error: 'userId не предоставлен' });
+      return res.status(400).json({ error: 'Требуется newMemberId' });
     }
 
     // Check if requester is admin
-    const admin = await query(
-      `SELECT role FROM conversation_members
-       WHERE conversation_id = ? AND user_id = ? AND role IN ('admin', 'moderator')`,
-      [conversationId, userId]
+    const isAdmin = await dbQuery<any>(
+      `SELECT id FROM group_members
+       WHERE group_id = ? AND user_id = ? AND role IN ('admin', 'moderator')`,
+      [groupId, userId]
     );
 
-    if (admin.length === 0) {
+    if (!isAdmin.length) {
       return res.status(403).json({ error: 'Доступ запрещен' });
     }
 
-    // Check if user already in group
-    const existing = await query(
-      'SELECT id FROM conversation_members WHERE conversation_id = ? AND user_id = ?',
-      [conversationId, newMemberId]
+    // Check if member already exists
+    const existing = await dbQuery<any>(
+      `SELECT id FROM group_members
+       WHERE group_id = ? AND user_id = ?`,
+      [groupId, newMemberId]
     );
 
     if (existing.length > 0) {
       return res.status(400).json({ error: 'Пользователь уже в группе' });
     }
 
-    // Add member
-    await execute(
-      `INSERT INTO conversation_members
-       (id, conversation_id, user_id, role)
-       VALUES (?, ?, ?, 'member')`,
-      [uuidv4(), conversationId, newMemberId]
+    await dbExecute(
+      `INSERT INTO group_members (id, group_id, user_id, role)
+       VALUES (?, ?, ?, ?)`,
+      [uuidv4(), groupId, newMemberId, 'member']
     );
 
-    const member = await query(
-      `SELECT u.id, u.username, u.display_name, u.avatar_url
-       FROM users u WHERE u.id = ?`,
-      [newMemberId]
-    );
-
-    res.status(201).json(member[0]);
+    res.status(201).json({ success: true });
   } catch (error) {
-    console.error('Add member error:', error);
+    console.error('[Group Member Add] Error:', error);
     res.status(500).json({ error: 'Ошибка при добавлении участника' });
   }
 });
 
 // Remove member from group
-router.delete('/:conversationId/members/:memberId', async (req: Request, res: Response) => {
+router.delete('/:groupId/members/:memberId', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
+    const userId = (req as any).userId;
+    const { groupId, memberId } = req.params;
 
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const { conversationId, memberId } = req.params;
-
-    // Check if requester is admin or removing themselves
+    // Can remove self or if admin
     if (userId !== memberId) {
-      const admin = await query(
-        `SELECT role FROM conversation_members
-         WHERE conversation_id = ? AND user_id = ? AND role IN ('admin', 'moderator')`,
-        [conversationId, userId]
+      const isAdmin = await dbQuery<any>(
+        `SELECT id FROM group_members
+         WHERE group_id = ? AND user_id = ? AND role = 'admin'`,
+        [groupId, userId]
       );
 
-      if (admin.length === 0) {
+      if (!isAdmin.length) {
         return res.status(403).json({ error: 'Доступ запрещен' });
       }
     }
 
-    await execute(
-      'DELETE FROM conversation_members WHERE conversation_id = ? AND user_id = ?',
-      [conversationId, memberId]
+    await dbExecute(
+      `DELETE FROM group_members
+       WHERE group_id = ? AND user_id = ?`,
+      [groupId, memberId]
     );
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Remove member error:', error);
+    console.error('[Group Member Remove] Error:', error);
     res.status(500).json({ error: 'Ошибка при удалении участника' });
   }
 });
 
-// Change member role (admin only)
-router.put('/:conversationId/members/:memberId/role', async (req: Request, res: Response) => {
+// Update member role (admin only)
+router.patch('/:groupId/members/:memberId/role', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const { conversationId, memberId } = req.params;
+    const userId = (req as any).userId;
+    const { groupId, memberId } = req.params;
     const { role } = req.body;
 
     if (!['member', 'moderator', 'admin'].includes(role)) {
@@ -316,62 +312,116 @@ router.put('/:conversationId/members/:memberId/role', async (req: Request, res: 
     }
 
     // Check if requester is admin
-    const admin = await query(
-      `SELECT role FROM conversation_members
-       WHERE conversation_id = ? AND user_id = ? AND role = 'admin'`,
-      [conversationId, userId]
+    const isAdmin = await dbQuery<any>(
+      `SELECT id FROM group_members
+       WHERE group_id = ? AND user_id = ? AND role = 'admin'`,
+      [groupId, userId]
     );
 
-    if (admin.length === 0) {
-      return res.status(403).json({ error: 'Только администратор может менять роли' });
+    if (!isAdmin.length) {
+      return res.status(403).json({ error: 'Доступ запрещен' });
     }
 
-    await execute(
-      'UPDATE conversation_members SET role = ? WHERE conversation_id = ? AND user_id = ?',
-      [role, conversationId, memberId]
+    await dbExecute(
+      `UPDATE group_members SET role = ?
+       WHERE group_id = ? AND user_id = ?`,
+      [role, groupId, memberId]
     );
 
-    res.json({ success: true, role });
+    res.json({ success: true });
   } catch (error) {
-    console.error('Change role error:', error);
-    res.status(500).json({ error: 'Ошибка при изменении роли' });
+    console.error('[Group Member Role Update] Error:', error);
+    res.status(500).json({ error: 'Ошибка при обновлении роли' });
   }
 });
 
-// Mute/unmute group for user
-router.post('/:conversationId/mute', async (req: Request, res: Response) => {
+// Get group messages
+router.get('/:groupId/messages', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
+    const { groupId } = req.params;
 
-    const token = authHeader.slice(7);
-    let userId: string;
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return res.status(401).json({ error: 'Неверный токен' });
-    }
-
-    const { conversationId } = req.params;
-    const { muteUntil } = req.body;
-
-    const mutedUntil = muteUntil
-      ? new Date(muteUntil).toISOString().slice(0, 19).replace('T', ' ')
-      : null;
-
-    await execute(
-      'UPDATE conversation_members SET muted_until = ? WHERE conversation_id = ? AND user_id = ?',
-      [mutedUntil, conversationId, userId]
+    const messages = await dbQuery<any>(
+      `SELECT
+        gm.id,
+        gm.group_id,
+        gm.sender_id,
+        u.display_name as sender_name,
+        gm.content,
+        gm.created_at,
+        gm.is_edited
+      FROM group_messages gm
+      LEFT JOIN users u ON u.id = gm.sender_id
+      WHERE gm.group_id = ? AND gm.is_deleted = FALSE
+      ORDER BY gm.created_at ASC
+      LIMIT 50`,
+      [groupId]
     );
 
-    res.json({ success: true, mutedUntil });
+    res.json(
+      messages.map((msg) => ({
+        id: msg.id,
+        groupId: msg.group_id,
+        senderId: msg.sender_id,
+        senderName: msg.sender_name,
+        content: msg.content,
+        createdAt: msg.created_at,
+        isEdited: msg.is_edited,
+      }))
+    );
   } catch (error) {
-    console.error('Mute group error:', error);
-    res.status(500).json({ error: 'Ошибка при отключении уведомлений' });
+    console.error('[Group Messages Get] Error:', error);
+    res.status(500).json({ error: 'Ошибка при загрузке сообщений' });
+  }
+});
+
+// Send message to group
+router.post('/:groupId/messages', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { groupId } = req.params;
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Сообщение не может быть пустым' });
+    }
+
+    // Check membership
+    const member = await dbQuery<any>(
+      `SELECT id FROM group_members
+       WHERE group_id = ? AND user_id = ?`,
+      [groupId, userId]
+    );
+
+    if (!member.length) {
+      return res.status(403).json({ error: 'Вы не являетесь членом этой группы' });
+    }
+
+    const messageId = uuidv4();
+    await dbExecute(
+      `INSERT INTO group_messages (id, group_id, sender_id, content)
+       VALUES (?, ?, ?, ?)`,
+      [messageId, groupId, userId, content.trim()]
+    );
+
+    const msg = await dbQuery<any>(
+      `SELECT gm.*, u.display_name as sender_name
+       FROM group_messages gm
+       LEFT JOIN users u ON u.id = gm.sender_id
+       WHERE gm.id = ?`,
+      [messageId]
+    );
+
+    res.status(201).json({
+      id: msg[0].id,
+      groupId: msg[0].group_id,
+      senderId: msg[0].sender_id,
+      senderName: msg[0].sender_name,
+      content: msg[0].content,
+      createdAt: msg[0].created_at,
+    });
+  } catch (error) {
+    console.error('[Group Message Send] Error:', error);
+    res.status(500).json({ error: 'Ошибка при отправке сообщения' });
   }
 });
 
