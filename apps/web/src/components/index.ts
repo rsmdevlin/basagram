@@ -9,6 +9,8 @@ export { TypingIndicator } from './TypingIndicator';
 export { MobileConversationMenu } from './MobileConversationMenu';
 export { LoginForm } from './LoginForm';
 export { RegisterForm } from './RegisterForm';
+export { SearchInput } from './SearchInput';
 export { TelegramLayout } from './TelegramLayout';
+
 
 
