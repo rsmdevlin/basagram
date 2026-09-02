@@ -2,8 +2,8 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import * as argon2 from 'argon2';
 import jwt from 'jsonwebtoken';
+import mysql from 'mysql2/promise';
 import { registerSchema, loginSchema } from '@basagram/validation';
-import { query, execute } from '@basagram/database';
 
 const router = Router();
 
@@ -23,6 +23,71 @@ interface UserRow {
   updated_at: Date;
 }
 
+// DB Connection Pool
+let pool: mysql.Pool;
+
+const getPool = async () => {
+  if (!pool) {
+    const getDatabaseConfig = () => {
+      if (process.env.DATABASE_URL) {
+        try {
+          const url = new URL(process.env.DATABASE_URL);
+          return {
+            host: url.hostname,
+            port: parseInt(url.port || '3306'),
+            user: url.username,
+            password: url.password,
+            database: url.pathname.slice(1),
+          };
+        } catch (e) {
+          console.error('Failed to parse DATABASE_URL:', e);
+        }
+      }
+
+      return {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '3306'),
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'basagram',
+      };
+    };
+
+    const config = getDatabaseConfig();
+    console.log(`[Auth DB] Connecting to ${config.host}:${config.port}/${config.database}`);
+
+    pool = mysql.createPool({
+      ...config,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+  }
+  return pool;
+};
+
+const dbQuery = async <T = any>(sql: string, params?: any[]): Promise<T[]> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
+  try {
+    const [rows] = await connection.query(sql, params || []);
+    return rows as T[];
+  } finally {
+    connection.release();
+  }
+};
+
+const dbExecute = async (sql: string, params?: any[]): Promise<any> => {
+  const p = await getPool();
+  const connection = await p.getConnection();
+  try {
+    const [result] = await connection.execute(sql, params || []);
+    return result;
+  } finally {
+    connection.release();
+  }
+};
+
 // Register
 router.post('/register', async (req: Request, res: Response) => {
   try {
@@ -34,7 +99,7 @@ router.post('/register', async (req: Request, res: Response) => {
     const { username, email, password, displayName } = parsed.data;
 
     // Check if user exists
-    const existing = await query<UserRow>(
+    const existing = await dbQuery<UserRow>(
       'SELECT id FROM users WHERE username = ? OR email = ?',
       [username, email]
     );
@@ -48,7 +113,7 @@ router.post('/register', async (req: Request, res: Response) => {
     const userId = uuidv4();
 
     // Create user
-    await execute(
+    await dbExecute(
       `INSERT INTO users (id, username, display_name, email, password_hash)
        VALUES (?, ?, ?, ?, ?)`,
       [userId, username, displayName, email, passwordHash]
@@ -87,7 +152,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const { email, password } = parsed.data;
 
     // Find user
-    const users = await query<UserRow>(
+    const users = await dbQuery<UserRow>(
       'SELECT id, email, password_hash FROM users WHERE email = ?',
       [email]
     );
@@ -109,7 +174,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const refreshToken = jwt.sign({ userId: user.id }, REFRESH_SECRET, { expiresIn: '30d' });
 
     // Get full user info
-    const fullUsers = await query<UserRow>(
+    const fullUsers = await dbQuery<UserRow>(
       'SELECT * FROM users WHERE id = ?',
       [user.id]
     );
@@ -174,7 +239,7 @@ router.get('/me', async (req: Request, res: Response) => {
     const token = authHeader.slice(7);
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
 
-    const users = await query<UserRow>(
+    const users = await dbQuery<UserRow>(
       'SELECT * FROM users WHERE id = ?',
       [decoded.userId]
     );
