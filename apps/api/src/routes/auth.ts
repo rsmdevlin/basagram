@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import * as argon2 from 'argon2';
 import jwt from 'jsonwebtoken';
 import mysql from 'mysql2/promise';
-import { registerSchema, loginSchema } from '@basagram/validation';
 
 const router = Router();
 
@@ -93,13 +92,22 @@ const dbExecute = async (sql: string, params?: any[]): Promise<any> => {
 router.post('/register', async (req: Request, res: Response) => {
   try {
     console.log('[Auth] Register request received:', { body: req.body });
-    const parsed = registerSchema.safeParse(req.body);
-    if (!parsed.success) {
-      console.log('[Auth] Validation failed:', parsed.error);
-      return res.status(400).json({ error: 'Ошибка валидации', details: parsed.error });
+    const { username, email, password, displayName } = req.body;
+
+    // Inline validation
+    if (!username || username.length < 3) {
+      return res.status(400).json({ error: 'Имя пользователя минимум 3 символа' });
+    }
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Некорректный email' });
+    }
+    if (!password || password.length < 8) {
+      return res.status(400).json({ error: 'Пароль должен быть минимум 8 символов' });
+    }
+    if (!displayName) {
+      return res.status(400).json({ error: 'Введите ваше имя' });
     }
 
-    const { username, email, password, displayName } = parsed.data;
     console.log('[Auth] Validated data:', { username, email, displayName });
 
     // Check if user exists
@@ -151,12 +159,15 @@ router.post('/register', async (req: Request, res: Response) => {
 // Login
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const parsed = loginSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Ошибка валидации' });
-    }
+    const { email, password } = req.body;
 
-    const { email, password } = parsed.data;
+    // Inline validation
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Некорректный email' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Пароль должен быть минимум 6 символов' });
+    }
 
     // Find user
     const users = await dbQuery<UserRow>(
@@ -207,8 +218,8 @@ router.post('/login', async (req: Request, res: Response) => {
       refreshToken,
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Ошибка при входе' });
+    console.error('[Auth] Login error:', error);
+    res.status(500).json({ error: 'Ошибка при входе', details: String(error) });
   }
 });
 
